@@ -1,0 +1,4 @@
+- [x] Doritos
+- [ ] Algoritmo generativo
+- [ ] Algoritmo particulas
+- [ ] Algoritmo recocido
