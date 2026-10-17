@@ -49,7 +49,11 @@ def normal():
 
 def main():
     # normal()
-    mapa = generate_random_map()
-    final = simulated_annealing(mapa, 70)
+    final = simulated_annealing(generate_random_map(), 40)
+    print("penalizacion enemigos:", calculate_enemy_penalty(final))
+    print("pene recompenza:", calculate_reward_penalty(final))
+    solution = bfs(final)
+    if solution is not None:
+        print("dificulty:", get_dificulty(final, solution))
     fancy_print(final)
     # print(mapa.tolist())
