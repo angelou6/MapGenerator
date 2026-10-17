@@ -7,10 +7,21 @@ authors = [
     { name = "angelou6", email = "68724210+angelou6@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.4",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+reportAny = false # Puede que cause problemas pero posiblemente no
+
+[tool.ruff]
+line-length = 88
 
 [project.scripts]
 map = "mapgenerator.main:main"
+tacobell = "mapgenerator.tacobell:main" # Pruebas random
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]

@@ -1,4 +1,9 @@
 - [x] Doritos
+- [x] Funciones de busqueda de camino
+  - [x] BFS
+  - [ ] A*
+- [x] Funciones base del mapa
+  - [ ] Implementar penalización de distribución
 - [ ] Algoritmo generativo
 - [ ] Algoritmo particulas
 - [ ] Algoritmo recocido
