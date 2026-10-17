@@ -6,4 +6,4 @@
   - [ ] Implementar penalización de distribución
 - [ ] Algoritmo generativo
 - [ ] Algoritmo particulas
-- [ ] Algoritmo recocido
+- [x] Algoritmo recocido
