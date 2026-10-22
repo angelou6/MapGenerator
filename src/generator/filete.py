@@ -18,26 +18,36 @@ MOVABLE_MASK[14, 14] = False
 def random_cell(mapa: NDArray[np.int32], value: Elemento):
     mask = MOVABLE_MASK & (mapa == value)
     cells = np.argwhere(mask)
+    #devolvera none si no hay casilla disponible para el valor buscado
+    if len(cells) == 0:
+        return None
     return tuple(cells[rng.integers(len(cells))])
 
 
 def swap_move(candidate: NDArray[np.int32]):
+    #intercambia una casilla libre con una ocupada
     first = random_cell(candidate, Elemento.TRANSITABLE)
-    second = random_cell(candidate, Elemento(candidate[first]))
+    occupied = np.argwhere(MOVABLE_MASK & (candidate != Elemento.TRANSITABLE))
+    if first is None or len(occupied) == 0:
+        return
+
+    second = tuple(occupied[rng.integers(len(occupied))])
     candidate[first], candidate[second] = candidate[second], candidate[first]
 
 
 def count_move(candidate: NDArray[np.int32]):
     element = random.choice(list(CONSTRAINTS))
     count = np.count_nonzero(candidate == element)
-
+    #Permite agregar como quitar elementos sin salir de los rangos en lugar de favorecer la adición
     lo, hi = CONSTRAINTS[element]
-    if count < hi:
+    if count < lo or (count < hi and random.random() < 0.5):
         cell = random_cell(candidate, Elemento.TRANSITABLE)
-        candidate[cell] = element
+        if cell is not None:
+            candidate[cell] = element
     elif count > lo:
         cell = random_cell(candidate, element)
-        candidate[cell] = Elemento.TRANSITABLE
+        if cell is not None:
+            candidate[cell] = Elemento.TRANSITABLE
 
 
 def neighbor(mapa: NDArray[np.int32]) -> NDArray[np.int32]:

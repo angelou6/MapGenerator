@@ -1,3 +1,4 @@
+from collections import deque
 from typing import Annotated
 
 import numpy as np
@@ -83,10 +84,9 @@ def get_close_elements(
 
         if len(others) == 0:
             continue
-
+        #penaliza las distancias que sean menores a 2 distancia minima por el maestro
         dist = np.max(np.abs(others - [ra, ca]), axis=1)
-        if np.any(dist <= distance):
-            count += 1
+        count += int(np.count_nonzero(dist < distance))
     return count
 
 
@@ -107,6 +107,30 @@ def calculate_enemy_penalty(mapa: NDArray[np.int32]) -> int:
     return close_encounters_of_the_enemy_kind + close_to_start
 
 
+def count_accesible_rewards(mapa: NDArray[np.int32]) -> int:
+    #Cuenta las recompensas a las que no se puede llegar desde el inicio, contando las encerradas en recuadros grandes
+    queue = deque([(0, 0)])
+    visited = {(0, 0)}
+    count = 0
+
+    while queue:
+        row, col= queue.popleft()
+        if mapa[row, col] == Elemento.RECOMPENZA:
+            count += 1
+
+        for nr, nc in [(row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1)]:
+            if (
+                0 <= nr < MAP_SHAPE[0]
+                and 0 <= nc < MAP_SHAPE[1]
+                and (nr, nc) not in visited
+                and mapa[nr, nc] != Elemento.OBSTACULO
+            ):
+                visited.add((nr, nc))
+                queue.append((nr, nc))
+
+    return count
+
+
 def calculate_reward_penalty(mapa: NDArray[np.int32]) -> int:
     """
     Calcula la penalización de recompensas, lee el documento para más información.
@@ -117,38 +141,29 @@ def calculate_reward_penalty(mapa: NDArray[np.int32]) -> int:
     Returns:
         int: Penalización de recompensas.
     """
-    shape = MAP_SHAPE[0]  # It's a fucking square
-
-    lmap = mapa.tolist()
-    count = 0
-    for r in range(shape):
-        row = lmap[r]
-        for c in range(shape):
-            if row[c] != Elemento.RECOMPENZA:
-                continue
-
-            if (
-                (r == 0 or lmap[r - 1][c] in BLOCKERS)
-                and (r == shape - 1 or lmap[r + 1][c] in BLOCKERS)
-                and (c == 0 or row[c - 1] in BLOCKERS)
-                and (c == shape - 1 or row[c + 1] in BLOCKERS)
-            ):
-                count += 1
-    return count * 100
+    #penaliza con 100 cada recompenza que no se puede alcanzar, de entender mal correegir
+    total = np.count_nonzero(mapa == Elemento.RECOMPENZA)
+    return int(100 * (total - count_accesible_rewards(mapa)))
 
 
 def calculate_distrubution_penalty(mapa: NDArray[np.int32]) -> int:
-    """
-    Calcula la penalización de distribución, lee el documento para más información.
+    #Penaliza zonas de 5x5 con demasiados elementos para evitar que haya mucha concentracion
+    tolerancias = {
+        Elemento.OBSTACULO: 2,
+        Elemento.ENEMIGO: 1,
+        Elemento.RECOMPENZA: 1,
+    }
+    penalizacion = 0
 
-    Args:
-        mapa: Array 2D de Numpy que representa el mapa.
-
-    Returns:
-        int: Penalización de distribución.
-    """
-    # TODO: Esta funcion entera
-    return 0
+    for elemento, tolerancia in tolerancias.items():
+        promedio = round(np.count_nonzero(mapa == elemento) / 9)
+        for fila in range(0, MAP_SHAPE[0], 5):
+            for columna in range(0, MAP_SHAPE[1], 5):
+                zona = mapa[fila : fila + 5, columna : columna +5 ]
+                cantidad = np.count_nonzero(zona == elemento)
+                #suma solo el exceso fuera de la tolerancia
+                penalizacion += max(0, abs(cantidad - promedio) - tolerancia)
+    return int(penalizacion)
 
 
 def calculate_path_penalty(
@@ -224,7 +239,7 @@ def calculate_fitness(
     Returns:
         int: Fitness del mapa.
     """
-    w1, w2, w3, w4, w5 = (50, 10, 3, 5, 2)
+    w1, w2, w3, w4, w5 = (50, 10, 5, 5, 2)
     p_camino = calculate_path_penalty(mapa, solution)
     p_dificultad = (
         calculate_dificulty_penalty(mapa, solution, expected_dificulty)
