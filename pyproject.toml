@@ -9,12 +9,14 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "numpy>=2.5.4",
+    "pygame-ce>=2.5.8",
 ]
 
 [tool.pyright]
+extraPaths = ["src"]
 venvPath = "."
 venv = ".venv"
-reportAny = false # Puede que cause problemas pero posiblemente no
+reportAny = false
 
 [tool.ruff]
 line-length = 88
@@ -22,6 +24,7 @@ line-length = 88
 [project.scripts]
 map = "mapgenerator.main:main"
 tacobell = "mapgenerator.tacobell:main" # Pruebas random
+game = "game.main:main"
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
