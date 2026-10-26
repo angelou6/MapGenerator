@@ -9,6 +9,8 @@ from representation import BLOCKERS, MAP_SHAPE, Elemento
 
 #oswaldo estuvo aqui
 import random
+import os
+import json
 #oswaldo se fue de aqui
 
 rng = np.random.default_rng()
@@ -325,5 +327,48 @@ def reparar_mapa_completo(matriz_mapa):
     
     return matriz_mapa
 
+def generar_y_guardar_mapas(cantidad=100, nombre_archivo="poblacion_inicial.json"):
+    """
+    Oswaldo preparo la tierra prometida. 
+    guardara la peregrinacion inicial en un archivo Json (quien es Json?)
+    en la carpeta 'Mapas' del proyecto
+    """
+    # 1. Oswaldo necesita saber la ruta actual del generador 
+    directorio_actual = os.path.dirname(os.path.abspath(__file__))
+    
+    # 2. Oswaldo entra a la carpeta de los mapas, QUE HORROR, parece que no ha pasado una escoba
+    # por aqui en años
+    directorio_raiz = os.path.dirname(directorio_actual)
+    carpeta_mapas = os.path.join(directorio_raiz, "Mapas")
+    
+    # 3. Oswaldo piensa que algo a prueba de estupidos es algo bien hecho, asi que 
+    # para salvarse de si mismo, pone esto por si borro la carpeta
+    os.makedirs(carpeta_mapas, exist_ok=True)
+    
+    # 4. Oswaldo define la ruta del archivo, pero que, parece que oswaldo ya no puede mas
+    # oswaldo quiere tomar un baño e irse a dormir
+    ruta_completa = os.path.join(carpeta_mapas, nombre_archivo)
+    
+    lista_de_mapas = []
+    
+    for _ in range(cantidad):
+        # Queda poco oswaldo, se fuerte, guardamos el mapa
+        mapa_np = generate_random_map()
+        
+        # Oswaldo le da una pasada de control de calidad, oswaldo no sabe que debe de buscar
+        mapa_reparado = reparar_mapa_completo(mapa_np)
+        
+        # Json no entiende numpy, asi que lo pasamos a lista, jaja, estupido Json
+        mapa_lista = mapa_reparado.tolist()
+        
+        lista_de_mapas.append({
+            "matrix": mapa_lista
+        })
+        
+    # 5. Guardar el archivo JSON, pero en fa que ya nos queremos ir a dormi
+    with open(ruta_completa, 'w', encoding='utf-8') as archivo:
+        json.dump(lista_de_mapas, archivo)
+        
+    print(f"Oswaldo ha guardado {cantidad} mapas exitosamente en:\n{ruta_completa}")
 #Fin del trabajo de oswaldo, por ahora, oswaldo esta roto por dentro, pero su sueño de jugar al zelda remake 
 #sigue en pie

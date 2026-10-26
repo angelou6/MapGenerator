@@ -402,14 +402,12 @@ class Genetic:
 # --- Zona de pruebas  ---
 
 if __name__ == "__main__":
-    # Creamos un mundo con 100 mapas (el estándar de Oswaldo)
+    # Creamos un mundo con 100 mapas 
     ag = Genetic(population_size=100)
     
-    # Viajamos en el tiempo por 20 generaciones para ver cómo mejoran
     mapa_supremo, historia_del_mundo = ag.entrenar(total_generaciones=20)
     
     # Aquí puedes comprobar que la historia se guardó correctamente
-    print(f"\nOswaldo registró {len(historia_del_mundo)} épocas en su bitácora.")
-    print("La matriz ganadora está lista para ser renderizada en la vista gráfica.")
+    print(f"\nOswaldo registro {len(historia_del_mundo)} generaciones, ya denle un aumento al wey")
 
 #Aqui termina el trabajo de oswaldo, por ahora, oswaldo consiguio comida mientras terminaba esto, pero no hubo coca
