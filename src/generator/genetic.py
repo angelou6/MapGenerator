@@ -22,7 +22,7 @@ from path_search.breadth import bfs
 import numpy as np
 
 class Genetic:
-    def __init__(self, population_size=100, limites_manuales=None):
+    def __init__(self, population_size=100, limites_manuales=None, poblacion_base=None):
             """
             Oswaldo, el genio de la genética de mapas, ha decidido crear una clase para manejar la evolución de mapas.
             :param population_size: es el tamaño de la poblacion de mapas de cada generacion,
@@ -33,6 +33,14 @@ class Genetic:
             self.population = []  # oswaldo guardo la lista de mapas aqui, oswaldo dice que esa es la pobracion inicial
             self.generation = 1   # este es un contador de generaciones, oswealdo piensa que suena estupido, pero quien es
             #el para para decir lo que es estupido y lo que no
+            
+            # Si Oswaldo recibe un cargamento de mapas desde el main (el json), los procesa aqui
+            if poblacion_base is not None:
+                for mapa in poblacion_base:
+                    # El JSON guarda listas normales (ta bien wey), pero el evaluador pide Numpy Arrays
+                    matriz_np = np.array(mapa["matrix"])
+                    self.population.append({"matrix": matriz_np, "fitness": None})
+                self.population_size = len(poblacion_base)
             
             # Oswaldo tiene que saber si los limites que le envieron estan puestos por el usuario, o si debe usar los que
             # el manual le indica
@@ -398,16 +406,5 @@ class Genetic:
         
         # Lo ponemos como el mas cabron de todos los tiempos, y lo regresamos 
         return mejor_historico, self.historial
-
-# --- Zona de pruebas  ---
-
-if __name__ == "__main__":
-    # Creamos un mundo con 100 mapas 
-    ag = Genetic(population_size=100)
-    
-    mapa_supremo, historia_del_mundo = ag.entrenar(total_generaciones=20)
-    
-    # Aquí puedes comprobar que la historia se guardó correctamente
-    print(f"\nOswaldo registro {len(historia_del_mundo)} generaciones, ya denle un aumento al wey")
 
 #Aqui termina el trabajo de oswaldo, por ahora, oswaldo consiguio comida mientras terminaba esto, pero no hubo coca
