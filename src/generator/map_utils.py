@@ -7,6 +7,10 @@ from numpy._typing import NDArray
 from path_search.utils import get_ajacent_blockers
 from representation import BLOCKERS, MAP_SHAPE, Elemento
 
+#oswaldo estuvo aqui
+import random
+#oswaldo se fue de aqui
+
 rng = np.random.default_rng()
 
 CONSTRAINTS: Annotated[
@@ -146,7 +150,7 @@ def calculate_reward_penalty(mapa: NDArray[np.int32]) -> int:
     return int(100 * (total - count_accesible_rewards(mapa)))
 
 
-def calculate_distrubution_penalty(mapa: NDArray[np.int32]) -> int:
+def calculate_distribution_penalty(mapa: NDArray[np.int32]) -> int:
     #Penaliza zonas de 5x5 con demasiados elementos para evitar que haya mucha concentracion
     tolerancias = {
         Elemento.OBSTACULO: 2,
@@ -182,7 +186,7 @@ def calculate_path_penalty(
     return 10000 if solution is None else 0
 
 
-def get_dificulty(mapa: NDArray[np.int32], solution: list[tuple[int, int]]) -> float:
+def get_difficulty(mapa: NDArray[np.int32], solution: list[tuple[int, int]]) -> float:
     """
     Calcula la dificultad.
 
@@ -220,7 +224,7 @@ def calculate_dificulty_penalty(
     Returns:
         int: Penalización de dificultad.
     """
-    return np.abs(get_dificulty(mapa, solution) - expected_dificulty)
+    return np.abs(get_difficulty(mapa, solution) - expected_dificulty)
 
 
 def calculate_fitness(
@@ -248,7 +252,7 @@ def calculate_fitness(
     )  # I'm so fucking tired
     p_enemigos = calculate_enemy_penalty(mapa)
     p_recompensas = calculate_reward_penalty(mapa)
-    p_distribucion = calculate_distrubution_penalty(mapa)
+    p_distribucion = calculate_distribution_penalty(mapa)
 
     return (
         w1 * p_camino
@@ -257,3 +261,69 @@ def calculate_fitness(
         + w4 * p_recompensas
         + w5 * p_distribucion
     )
+
+#Oswaldo nuevamente hace acto de presencia, esta vez sin hambre de comida, pero con hambre de exito
+def reparar_cantidad_elemento(matriz_mapa, caracter_elemento, limite_minimo, limite_maximo):
+    """
+    Oswaldo decidio ajustar los elementos, que estan representados por caracteres ('#', 'E', 'R') 
+    para que cumplan con los limites que se establecieron, Oswaldo garantiza que el inicio y la meta
+    no se moveran durante este proceso, pero no garantiza que el precio de la tortilla deje de subir
+
+    El poder de Oswaldo es muy limitado
+
+    """
+    coordenadas_del_elemento = []
+    coordenadas_vacias = []
+
+    # Oswaldo decide escanear el mapa y guardar las coordenadas de todos los elementos y espacios vacios
+    for fila in range(len(matriz_mapa)):
+        for columna in range(len(matriz_mapa[0])):
+            if matriz_mapa[fila][columna] == caracter_elemento:
+                coordenadas_del_elemento.append((fila, columna))
+            elif matriz_mapa[fila][columna] == '.':
+                coordenadas_vacias.append((fila, columna))
+                
+    cantidad_actual = len(coordenadas_del_elemento)
+    
+    # A oswaldo no le gustan los excesos, asi que si los hay, convertimos elementos sobrantes 
+    # en espacios vacíos al azar
+    while cantidad_actual > limite_maximo and coordenadas_del_elemento:
+        fila_elegida, columna_elegida = random.choice(coordenadas_del_elemento)
+        matriz_mapa[fila_elegida][columna_elegida] = '.'
+        coordenadas_del_elemento.remove((fila_elegida, columna_elegida))
+        coordenadas_vacias.append((fila_elegida, columna_elegida))
+        cantidad_actual -= 1
+        
+    # Si hay algo que oswaldo odie mas que los excesos, es la escasez, y si encontramos una,
+    # tomamos espacios vacíos al azar y agregamos el elemento
+
+    while cantidad_actual < limite_minimo and coordenadas_vacias:
+        fila_elegida, columna_elegida = random.choice(coordenadas_vacias)
+        matriz_mapa[fila_elegida][columna_elegida] = caracter_elemento
+        coordenadas_vacias.remove((fila_elegida, columna_elegida))
+        coordenadas_del_elemento.append((fila_elegida, columna_elegida))
+        cantidad_actual += 1
+        
+    return matriz_mapa
+
+def reparar_mapa_completo(matriz_mapa):
+    """
+    Oswaldo es un hombre que necesita seguridad, por lo tanto, decidio implementar esta seccion de codigo 
+    para asegurarse de que el mapa cumpla con los limites establecidos para cada tipo de elemento,
+    y asi evitar que el mapa sea demasiado facil o demasiado dificil
+
+    A Oswaldo le haria bien un baño ahora, pero no tiene tiempo para eso
+
+    """
+    MINIMO_OBSTACULOS, MAXIMO_OBSTACULOS = 30, 45
+    MINIMO_ENEMIGOS, MAXIMO_ENEMIGOS = 4, 8
+    MINIMO_RECOMPENSAS, MAXIMO_RECOMPENSAS = 3, 6
+
+    matriz_mapa = reparar_cantidad_elemento(matriz_mapa, '#', MINIMO_OBSTACULOS, MAXIMO_OBSTACULOS)
+    matriz_mapa = reparar_cantidad_elemento(matriz_mapa, 'E', MINIMO_ENEMIGOS, MAXIMO_ENEMIGOS)
+    matriz_mapa = reparar_cantidad_elemento(matriz_mapa, 'R', MINIMO_RECOMPENSAS, MAXIMO_RECOMPENSAS)
+    
+    return matriz_mapa
+
+#Fin del trabajo de oswaldo, por ahora, oswaldo esta roto por dentro, pero su sueño de jugar al zelda remake 
+#sigue en pie

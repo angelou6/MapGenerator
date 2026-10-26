@@ -2,13 +2,13 @@ import time
 
 from generator.filete import simulated_annealing
 from generator.map_utils import (
-    calculate_distrubution_penalty,
+    calculate_distribution_penalty,
     calculate_enemy_penalty,
     calculate_path_penalty,
     calculate_reward_penalty,
     fancy_print,
     generate_random_map,
-    get_dificulty,
+    get_difficulty,
 )
 from path_search.breadth import bfs
 
@@ -40,10 +40,10 @@ def normal():
     solution = bfs(mapa)
     print("penalizacion enemigos:", calculate_enemy_penalty(mapa))
     print("pene recompenza:", calculate_reward_penalty(mapa))
-    print("p distribucion:", calculate_distrubution_penalty(mapa))
+    print("p distribucion:", calculate_distribution_penalty(mapa))
     print("p path:", calculate_path_penalty(mapa, solution))
     if solution is not None:
-        print("dificulty:", get_dificulty(mapa, solution))
+        print("dificulty:", get_difficulty(mapa, solution))
     fancy_print(mapa)
 
 
@@ -54,6 +54,6 @@ def main():
     print("pene recompenza:", calculate_reward_penalty(final))
     solution = bfs(final)
     if solution is not None:
-        print("dificulty:", get_dificulty(final, solution))
+        print("dificulty:", get_difficulty(final, solution))
     fancy_print(final)
     # print(mapa.tolist())
