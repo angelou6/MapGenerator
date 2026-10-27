@@ -105,6 +105,7 @@ class Entity:
             frame = pygame.transform.flip(frame, True, False)
             x -= frame.get_width() - TILE_SIZE
 
+        y -= frame.get_height() - TILE_SIZE
         _ = screen.blit(frame, (x, y))
 
 

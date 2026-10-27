@@ -1,7 +1,7 @@
 from typing import override
 
 from game.animation import Animation
-from game.assets import load_frames
+from game.assets import TILE_SIZE, load_frames
 from game.entity import Entity, World
 from path_search.breadth import find_path
 
@@ -13,7 +13,11 @@ class Zombie(Entity):
     detection_range: int = 5
 
     def __init__(self, col: int, row: int) -> None:
-        frames = load_frames("zombieToast.gif", crop=(72, 120, 120, 120))
+        frames = load_frames(
+            "zombieToast.gif",
+            crop=(72, 0, 120, 240),
+            size=(TILE_SIZE, TILE_SIZE * 2),
+        )
 
         self.idle_anim: Animation = Animation(frames[0:2], frame_time=0.3)
         self.move_anim: Animation = Animation(frames[0:8], frame_time=0.08)
