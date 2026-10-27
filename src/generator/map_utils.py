@@ -17,6 +17,9 @@ CONSTRAINTS: Annotated[
     Elemento.RECOMPENZA: (3, 6),
 }
 
+#pesos predeterminados para el fitness. Se cambian al llamar la funcion sin tener que editar estos valores
+DEFAULT_WEIGHTS = (50, 10, 5, 5, 2)
+
 FANCY_ELEMENTOS = {
     Elemento.TRANSITABLE: ".",
     Elemento.OBSTACULO: "#",
@@ -27,15 +30,22 @@ FANCY_ELEMENTOS = {
 }
 
 
-def generate_random_map() -> NDArray[np.int32]:
+def generate_random_map(escenario: str | None = None) -> NDArray[np.int32]:
     """
     Genera un mapa aleatoreo.
 
     Returns:
         NDArray[np.int32]: El mapa generado como array 15x15 de Numpy.
     """
+    #deja elegir los rangos del escenario sin modificar los rangos originales
+    rangos = CONSTRAINTS
+    if escenario is not None:
+        from generator.scenarios import get_scenario
+
+        rangos = get_scenario(escenario)["rangos"]
+
     total = MAP_SHAPE[0] * MAP_SHAPE[1] - 2
-    counts = {val: rng.integers(lo, hi + 1) for val, (lo, hi) in CONSTRAINTS.items()}
+    counts = {val: rng.integers(lo, hi + 1) for val, (lo, hi) in rangos.items()}
     flat = np.zeros(total, dtype=int)
     items = np.repeat(list(counts.keys()), list(counts.values()))
 
@@ -227,7 +237,8 @@ def calculate_fitness(
     mapa: NDArray[np.int32],
     solution: list[tuple[int, int]] | None,
     expected_dificulty: int,
-) -> int:
+    weights: tuple[float, float, float, float, float] = DEFAULT_WEIGHTS,
+) -> float:
     """
     Calcula el fitness del mapa.
 
@@ -237,9 +248,10 @@ def calculate_fitness(
         expected_dificulty: Dificultad esperada.
 
     Returns:
-        int: Fitness del mapa.
+        float: Fitness del mapa.
     """
-    w1, w2, w3, w4, w5 = (50, 10, 5, 5, 2)
+    #utiliza los pesos recibidos para calcular el fitness. Si no se indican utilizara los default de arriba
+    w1, w2, w3, w4, w5 = (weights)
     p_camino = calculate_path_penalty(mapa, solution)
     p_dificultad = (
         calculate_dificulty_penalty(mapa, solution, expected_dificulty)
@@ -257,3 +269,31 @@ def calculate_fitness(
         + w4 * p_recompensas
         + w5 * p_distribucion
     )
+
+
+#mide la diversidad sin modificar el fitness ni los mapas
+def calculate_hamming_distance(
+        mapa_a: NDArray[np.int32], mapa_b: NDArray[np.int32]
+) -> int:
+    """Cuenta las casillas que son diferentes entre dos mapas"""
+    #ccomprueba que ambos mapas tengan el mismo tamaño
+    if mapa_a.shape != mapa_b.shape:
+        raise ValueError("Los mapas deben tener el mismo tamaño")
+
+    return int(np.count_nonzero(mapa_a != mapa_b))
+
+
+def calculate_average_diversity(mapas: list[NDArray[np.int32]]) -> float:
+    """Calcula el promedio de diferencias entre los pares de mapas"""
+    if len(mapas) < 2:
+        return 0.0
+
+    total = 0
+    pares = 0
+    #compara las parejas una a la vez
+    for i in range(len(mapas)):
+        for j in range(i + 1, len(mapas)):
+            total += calculate_hamming_distance(mapas[i], mapas[j])
+            pares += 1
+
+    return total / pares
