@@ -24,6 +24,7 @@ class Entity:
     max_health: int = 1
     speed: float = 4
     damage: int = 1
+    hurt_flash: float = 0.2
 
     def __init__(
         self, col: int, row: int, animation: Animation, attack_anim: Animation
@@ -40,6 +41,7 @@ class Entity:
         self.animation: Animation = animation
         self.attack_anim: Animation = attack_anim
         self.health: int = self.max_health
+        self.hurt_time: float = 0
 
     @property
     def is_moving(self) -> bool:
@@ -55,6 +57,7 @@ class Entity:
 
     def take_damage(self, amount: int):
         self.health = max(0, self.health - amount)
+        self.hurt_time = self.hurt_flash
 
     def move(self, d_col: int, d_row: int, world: World) -> bool:
         if self.is_moving:
@@ -90,6 +93,7 @@ class Entity:
         self.x = approach(self.x, self.col, step)
         self.y = approach(self.y, self.row, step)
         self.animation.update(dt)
+        self.hurt_time = max(0, self.hurt_time - dt)
 
     def play(self, animation: Animation) -> None:
         if self.animation is not animation:
@@ -100,6 +104,11 @@ class Entity:
         frame = self.animation.frame
         x = self.x * TILE_SIZE
         y = self.y * TILE_SIZE
+
+        if self.hurt_time > 0:
+            frame = frame.copy()
+            _ = frame.fill((180, 0, 0), special_flags=pygame.BLEND_RGB_ADD)
+            _ = frame.fill((255, 90, 90), special_flags=pygame.BLEND_RGB_MULT)
 
         if self.facing_left:
             frame = pygame.transform.flip(frame, True, False)
