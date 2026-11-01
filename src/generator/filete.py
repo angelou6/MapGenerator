@@ -4,7 +4,7 @@ import random
 import numpy as np
 from numpy.typing import NDArray
 
-from generator.map_utils import CONSTRAINTS, calculate_fitness
+from generator.map_utils import CONSTRAINTS,DEFAULT_WEIGHTS, calculate_fitness
 from path_search.breadth import bfs
 from representation import MAP_SHAPE, Elemento
 
@@ -35,11 +35,16 @@ def swap_move(candidate: NDArray[np.int32]):
     candidate[first], candidate[second] = candidate[second], candidate[first]
 
 
-def count_move(candidate: NDArray[np.int32]):
-    element = random.choice(list(CONSTRAINTS))
+def count_move(
+    candidate: NDArray[np.int32],
+    rangos: dict[Elemento, tuple[int, int]] = CONSTRAINTS,
+):
+    #usa los limites del escenario elegido para meter o quitar elementos, y si no se especifica, pues deja los normales
+    element = random.choice(list(rangos))
     count = np.count_nonzero(candidate == element)
-    #Permite agregar como quitar elementos sin salir de los rangos en lugar de favorecer la adición
-    lo, hi = CONSTRAINTS[element]
+    lo, hi = rangos[element]
+
+#Permite agregar como quitar elementos sin salir de los rangos en lugar de favorecer la adición
     if count < lo or (count < hi and random.random() < 0.5):
         cell = random_cell(candidate, Elemento.TRANSITABLE)
         if cell is not None:
@@ -50,9 +55,13 @@ def count_move(candidate: NDArray[np.int32]):
             candidate[cell] = Elemento.TRANSITABLE
 
 
-def neighbor(mapa: NDArray[np.int32]) -> NDArray[np.int32]:
+def neighbor(
+    mapa: NDArray[np.int32],
+    rangos: dict[Elemento, tuple[int, int]] = CONSTRAINTS,
+) -> NDArray[np.int32]:
     candidate = mapa.copy()
-    count_move(candidate)
+    #envia los rangos seleccionados al movimiento veciono
+    count_move(candidate, rangos)
     if random.random() < 0.5:
         swap_move(candidate)
     return candidate
@@ -64,18 +73,29 @@ def simulated_annealing(
     steps: int = 10000,
     temp: float = 50,
     cooling_rate: float = 0.999,
+    history: list[tuple[float, float]] | None = None,
+    weights: tuple[float, float, float, float, float] = DEFAULT_WEIGHTS,
+    rangos: dict[Elemento, tuple[int, int]] = CONSTRAINTS,
 ) -> NDArray[np.int32]:
     current = mapa.copy()
     current_solution = bfs(current)
-    current_score = calculate_fitness(current, current_solution, expected_dificulty)
+    #Evalua con los pesos elegidos desde la ejecucion
+    current_score = calculate_fitness(current, current_solution, expected_dificulty, weights)
 
     best = current.copy()
     best_score = current_score
 
+    #Guarda el fitness actual y el mejor encontrado 
+    if history is not None:
+        history.clear()
+        history.append((float(current_score), float(best_score)))
+
     for _ in range(steps):
-        candidate = neighbor(current)
+        #los vecionos respetaran los rangos del escenario elegido
+        candidate = neighbor(current, rangos)
         solution = bfs(candidate)
-        score = calculate_fitness(candidate, solution, expected_dificulty)
+        #usa los mismo pesos que todos los candidatos
+        score = calculate_fitness(candidate, solution, expected_dificulty, weights)
         delta = score - current_score
         if delta <= 0 or random.random() < math.exp(-delta / temp):
             current = candidate
@@ -85,4 +105,9 @@ def simulated_annealing(
                 best = current.copy()
                 best_score = current_score
         temp *= cooling_rate
+
+        #Registran los valores despues de cada iteracion
+        if history is not None:
+            history.append((float(current_score), float(best_score)))
+
     return best
