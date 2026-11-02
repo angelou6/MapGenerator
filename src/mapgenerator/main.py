@@ -16,6 +16,9 @@ from generator.scenarios import SCENARIOS, get_scenario
 from generator.genetic import Genetic
 from path_search.breadth import bfs
 
+# Importamos la función orquestadora del PSO que acabamos de crear
+from generator.particulas import ejecutar_pso
+
 def guardar_grafica_convergencia(history: list[tuple[float, float]]) -> None:
     iteraciones = range(len(history))
     fitness_actual = [actual for actual, mejor in history]
@@ -34,7 +37,8 @@ def guardar_grafica_convergencia(history: list[tuple[float, float]]) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Orquestador del Proyecto Supremo de Mapas")
-    parser.add_argument("--algoritmo", choices=["recocido", "genetico"], default="recocido", help="Algoritmo a ejecutar")
+    # Agregamos "pso" a las opciones del algoritmo
+    parser.add_argument("--algoritmo", choices=["recocido", "genetico", "pso"], default="recocido", help="Algoritmo a ejecutar")
     parser.add_argument("--pesos", type=float, nargs=5, default=DEFAULT_WEIGHTS, help="Pesos del fitness")
     parser.add_argument("--escenario", choices=SCENARIOS, help="Escenario (opcional)")
     parser.add_argument("--dificultad", type=int, help="Dificultad objetivo")
@@ -70,6 +74,27 @@ def main():
         guardar_grafica_convergencia(history)
         print("\nResultados Recocido Simulado guardados en CSV e imagen.")
         fancy_print(final)
+
+    elif args.algoritmo == "pso":
+        print("\n[FASE 1] Desplegando el Enjambre de Partículas...")
+        # Ejecutamos el PSO con 30 partículas y 100 iteraciones (puedes ajustar estos valores)
+        mejor_mapa, historial_fitness = ejecutar_pso(num_particulas=30, iteraciones=100)
+        
+        print(f"\n[FASE 2] El Enjambre terminó. Mejor Fitness global: {historial_fitness[-1]}")
+        fancy_print(mejor_mapa)
+        
+        # Generar gráfica de convergencia específica para PSO
+        plt.figure(figsize=(9, 5))
+        plt.plot(range(len(historial_fitness)), historial_fitness, label="Mejor Fitness Global", linewidth=2, color="purple")
+        plt.xlabel("Iteración")
+        plt.ylabel("Fitness (menor es mejor)")
+        plt.title("Convergencia de Optimización por Enjambre de Partículas (PSO)")
+        plt.legend()
+        plt.grid(alpha=0.3)
+        plt.tight_layout()
+        plt.savefig("convergencia_pso.png", dpi=150)
+        plt.close()
+        print("Gráfica de convergencia del enjambre guardada como 'convergencia_pso.png'.")
 
 if __name__ == "__main__":
     main()
