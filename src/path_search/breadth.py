@@ -56,7 +56,7 @@ def bfs(mapa: NDArray[np.int32]) -> list[tuple[int, int]] | None:
     Busca un camino posible dentro de un mapa usando breadth-first search.
 
     Args:
-        NDArray[np.int32]: El mapa generado como array 15x15 de Numpy.
+        mapa: Array 2D de Numpy que representa el mapa.
 
     Returns:
         list[tuple[int, int]] or None: Devuelve la ruta encontrada,
@@ -72,3 +72,43 @@ def bfs(mapa: NDArray[np.int32]) -> list[tuple[int, int]] | None:
     if path is None:
         return None
     return [(row, col) for col, row in path]
+
+
+def reachable_tiles(mapa: NDArray[np.int32]) -> set[tuple[int, int]]:
+    """
+    Calcula todas las celdas alcanzables desde el inicio usando breadth-first search.
+
+    Args:
+        mapa: Array 2D de Numpy que representa el mapa.
+
+    Returns:
+        set[tuple[int, int]]: Conjunto de celdas (fila, columna) alcanzables desde el inicio.
+    """
+    rows, cols = mapa.shape
+    grid = mapa.tolist()
+    start = (0, 0)
+    if grid[0][0] in BLOCKERS:
+        return set()
+
+    visited: set[tuple[int, int]] = {start}
+    queue: deque[tuple[int, int]] = deque([start])
+
+    while queue:
+        row, col = queue.popleft()
+        for neighbor in (
+            (row - 1, col),
+            (row + 1, col),
+            (row, col - 1),
+            (row, col + 1),
+        ):
+            nrow, ncol = neighbor
+            if (
+                0 <= nrow < rows
+                and 0 <= ncol < cols
+                and neighbor not in visited
+                and grid[nrow][ncol] not in BLOCKERS
+            ):
+                visited.add(neighbor)
+                queue.append(neighbor)
+
+    return visited

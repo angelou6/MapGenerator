@@ -1,7 +1,12 @@
 import time
+from pathlib import Path
+
+import numpy as np
 
 from generator.filete import simulated_annealing
+from generator.genetic import genetic_algorithm
 from generator.map_utils import (
+    calculate_average_diversity,
     calculate_distrubution_penalty,
     calculate_enemy_penalty,
     calculate_path_penalty,
@@ -10,6 +15,8 @@ from generator.map_utils import (
     generate_random_map,
     get_dificulty,
 )
+from generator.particulas import particle_swarm
+from generator.scenarios import SCENARIOS, get_scenario
 from path_search.breadth import bfs
 
 
@@ -41,19 +48,50 @@ def normal():
     print("penalizacion enemigos:", calculate_enemy_penalty(mapa))
     print("pene recompenza:", calculate_reward_penalty(mapa))
     print("p distribucion:", calculate_distrubution_penalty(mapa))
-    print("p path:", calculate_path_penalty(mapa, solution))
+    print("p path:", calculate_path_penalty(solution))
     if solution is not None:
         print("dificulty:", get_dificulty(mapa, solution))
     fancy_print(mapa)
 
 
+def diversidad(ejecuciones: int = 5, dificultad: int = 40):
+    algoritmos = {
+        "aleatorio": lambda: generate_random_map(),
+        "recocido": lambda: simulated_annealing(dificultad, steps=2000),
+        "genetico": lambda: genetic_algorithm(dificultad, generations=30),
+        "particulas": lambda: particle_swarm(dificultad, iterations=30),
+    }
+    for nombre, generar in algoritmos.items():
+        mapas = [generar() for _ in range(ejecuciones)]
+        print(f"diversidad {nombre}:", calculate_average_diversity(mapas))
+
+
+EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
+
+
+def generar_ejemplos(dificultad_default: int = 40):
+    EXAMPLES_DIR.mkdir(exist_ok=True)
+    print(EXAMPLES_DIR)
+    escenarios: list[str | None] = [None, *SCENARIOS]
+    for escenario in escenarios:
+        dificultad = dificultad_default
+        if escenario is not None:
+            dificultad = get_scenario(escenario)["dificultad"] or dificultad_default
+        mapa = simulated_annealing(dificultad, escenario=escenario)
+        ruta = EXAMPLES_DIR / f"{escenario or 'default'}.npy"
+        np.save(ruta, mapa)
+        print(f"Guardado {ruta}")
+
+
 def main():
+    # generar_ejemplos()
+    # diversidad()
     # normal()
-    final = simulated_annealing(generate_random_map(), 40)
+    # print(mapa.tolist())
+    final = simulated_annealing(40)
     print("penalizacion enemigos:", calculate_enemy_penalty(final))
     print("pene recompenza:", calculate_reward_penalty(final))
     solution = bfs(final)
     if solution is not None:
         print("dificulty:", get_dificulty(final, solution))
     fancy_print(final)
-    # print(mapa.tolist())

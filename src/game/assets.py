@@ -1,11 +1,15 @@
+from pathlib import Path
+
 import pygame
 from pygame.surface import Surface
 
 TILE_SIZE = 40
+# Ruta absoluta para que el juego funcione desde cualquier directorio.
+ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets"
 
 
 def load_image(name: str) -> Surface:
-    return pygame.image.load(f"assets/{name}").convert_alpha()
+    return pygame.image.load(ASSETS_DIR / name).convert_alpha()
 
 
 def load_frames(
@@ -14,7 +18,7 @@ def load_frames(
     size: tuple[int, int] | None = None,
 ) -> list[Surface]:
     frames: list[Surface] = []
-    for frame, _duration in pygame.image.load_animation(f"assets/{name}"):
+    for frame, _duration in pygame.image.load_animation(ASSETS_DIR / name):
         frame = frame.convert_alpha()
         if crop is not None:
             frame = frame.subsurface(crop)
