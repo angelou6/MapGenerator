@@ -41,7 +41,7 @@ def normal():
     print("penalizacion enemigos:", calculate_enemy_penalty(mapa))
     print("pene recompenza:", calculate_reward_penalty(mapa))
     print("p distribucion:", calculate_distrubution_penalty(mapa))
-    print("p path:", calculate_path_penalty(mapa, solution))
+    print("p path:", calculate_path_penalty(solution))
     if solution is not None:
         print("dificulty:", get_dificulty(mapa, solution))
     fancy_print(mapa)
@@ -49,7 +49,7 @@ def normal():
 
 def main():
     # normal()
-    final = simulated_annealing(generate_random_map(), 40)
+    final = simulated_annealing(40)
     print("penalizacion enemigos:", calculate_enemy_penalty(final))
     print("pene recompenza:", calculate_reward_penalty(final))
     solution = bfs(final)

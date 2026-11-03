@@ -3,7 +3,7 @@
   - [x] BFS
   - [ ] A*
 - [x] Funciones base del mapa
-  - [ ] Implementar penalización de distribución
-- [ ] Algoritmo generativo
-- [ ] Algoritmo particulas
+  - [x] Implementar penalización de distribución
+- [x] Algoritmo generativo
+- [x] Algoritmo particulas
 - [x] Algoritmo recocido

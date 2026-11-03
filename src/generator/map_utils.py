@@ -3,8 +3,9 @@ from typing import Annotated
 import numpy as np
 from numpy._typing import NDArray
 
+from path_search.breadth import bfs, reachable_tiles
 from path_search.utils import get_ajacent_blockers
-from representation import BLOCKERS, MAP_SHAPE, Elemento
+from representation import MAP_SHAPE, Elemento
 
 rng = np.random.default_rng()
 
@@ -15,6 +16,10 @@ CONSTRAINTS: Annotated[
     Elemento.ENEMIGO: (5, 10),
     Elemento.RECOMPENZA: (3, 6),
 }
+
+MOVABLE_MASK = np.ones(MAP_SHAPE, dtype=bool)
+MOVABLE_MASK[0, 0] = False
+MOVABLE_MASK[-1, -1] = False
 
 FANCY_ELEMENTOS = {
     Elemento.TRANSITABLE: ".",
@@ -43,6 +48,46 @@ def generate_random_map() -> NDArray[np.int32]:
     flat = np.concatenate(([Elemento.INICIO], flat, [Elemento.META]))
 
     return flat.reshape(MAP_SHAPE)
+
+
+def repair(
+    mapa: NDArray[np.int32], priority: NDArray[np.float64] | None = None
+) -> NDArray[np.int32]:
+    """
+    Repara el mapa para que respete los limites de CONSTRAINTS y que inicio y
+    meta esten en su lugar.
+
+    Si sobran elementos se quitan los de menor prioridad; si faltan se agregan
+    en las celdas transitables de mayor prioridad. Sin prioridad se elige al azar.
+
+    Args:
+        mapa: Array 2D de Numpy que representa el mapa. Se modifica en el lugar.
+        priority: Array 2D con la prioridad de cada celda.
+
+    Returns:
+        NDArray[np.int32]: El mismo mapa ya reparado.
+    """
+    if priority is None:
+        priority = rng.random(MAP_SHAPE)
+
+    mapa[~MOVABLE_MASK] = Elemento.TRANSITABLE
+    mapa[mapa > Elemento.RECOMPENZA] = Elemento.TRANSITABLE
+
+    for element, (lo, hi) in CONSTRAINTS.items():
+        cells = np.argwhere(mapa == element)
+        if len(cells) > hi:
+            order = np.argsort(priority[cells[:, 0], cells[:, 1]])
+            extra = cells[order[: len(cells) - hi]]
+            mapa[extra[:, 0], extra[:, 1]] = Elemento.TRANSITABLE
+        elif len(cells) < lo:
+            free = np.argwhere(MOVABLE_MASK & (mapa == Elemento.TRANSITABLE))
+            order = np.argsort(-priority[free[:, 0], free[:, 1]])
+            chosen = free[order[: lo - len(cells)]]
+            mapa[chosen[:, 0], chosen[:, 1]] = element
+
+    mapa[0, 0] = Elemento.INICIO
+    mapa[-1, -1] = Elemento.META
+    return mapa
 
 
 def fancy_print(mapa: NDArray[np.int32]):
@@ -111,35 +156,27 @@ def calculate_reward_penalty(mapa: NDArray[np.int32]) -> int:
     """
     Calcula la penalización de recompensas, lee el documento para más información.
 
+    Cada recompensa que no se puede alcanzar desde el inicio (usando BFS)
+    recibe una penalización de 100.
+
     Args:
         mapa: Array 2D de Numpy que representa el mapa.
 
     Returns:
         int: Penalización de recompensas.
     """
-    shape = MAP_SHAPE[0]  # It's a fucking square
-
-    lmap = mapa.tolist()
-    count = 0
-    for r in range(shape):
-        row = lmap[r]
-        for c in range(shape):
-            if row[c] != Elemento.RECOMPENZA:
-                continue
-
-            if (
-                (r == 0 or lmap[r - 1][c] in BLOCKERS)
-                and (r == shape - 1 or lmap[r + 1][c] in BLOCKERS)
-                and (c == 0 or row[c - 1] in BLOCKERS)
-                and (c == shape - 1 or row[c + 1] in BLOCKERS)
-            ):
-                count += 1
-    return count * 100
+    reachable = reachable_tiles(mapa)
+    rewards = map(tuple, np.argwhere(mapa == Elemento.RECOMPENZA).tolist())
+    unreachable = sum(1 for reward in rewards if reward not in reachable)
+    return unreachable * 100
 
 
 def calculate_distrubution_penalty(mapa: NDArray[np.int32]) -> int:
     """
-    Calcula la penalización de distribución, lee el documento para más información.
+    Calcula la penalización de distribución.
+
+    Divide el mapa en zonas de 5x5 y penaliza las zonas cuya cantidad de
+    obstáculos, enemigos o recompensas se aleja demasiado del promedio.
 
     Args:
         mapa: Array 2D de Numpy que representa el mapa.
@@ -147,13 +184,27 @@ def calculate_distrubution_penalty(mapa: NDArray[np.int32]) -> int:
     Returns:
         int: Penalización de distribución.
     """
-    # TODO: Esta funcion entera
-    return 0
+    tolerancias = {
+        Elemento.OBSTACULO: 2,
+        Elemento.ENEMIGO: 1,
+        Elemento.RECOMPENZA: 1,
+    }
+    zone = 5
+    rows, cols = MAP_SHAPE
+    n_zones = (rows // zone) * (cols // zone)
+
+    penalizacion = 0
+    for elemento, tolerancia in tolerancias.items():
+        promedio = round(np.count_nonzero(mapa == elemento) / n_zones)
+        for fila in range(0, rows, zone):
+            for columna in range(0, cols, zone):
+                zona = mapa[fila : fila + zone, columna : columna + zone]
+                cantidad = np.count_nonzero(zona == elemento)
+                penalizacion += max(0, abs(cantidad - promedio) - tolerancia)
+    return int(penalizacion)
 
 
-def calculate_path_penalty(
-    mapa: NDArray[np.int32], solution: list[tuple[int, int]] | None
-) -> int:
+def calculate_path_penalty(solution: list[tuple[int, int]] | None) -> int:
     """
     Calcula la penalización del camino, lee el documento para más información.
 
@@ -225,7 +276,7 @@ def calculate_fitness(
         int: Fitness del mapa.
     """
     w1, w2, w3, w4, w5 = (50, 10, 3, 5, 2)
-    p_camino = calculate_path_penalty(mapa, solution)
+    p_camino = calculate_path_penalty(solution)
     p_dificultad = (
         calculate_dificulty_penalty(mapa, solution, expected_dificulty)
         if solution is not None
@@ -242,3 +293,17 @@ def calculate_fitness(
         + w4 * p_recompensas
         + w5 * p_distribucion
     )
+
+
+def evaluate(mapa: NDArray[np.int32], expected_dificulty: int) -> float:
+    """
+    Busca el camino del mapa con BFS y calcula su fitness.
+
+    Args:
+        mapa: Array 2D de Numpy que representa el mapa.
+        expected_dificulty: Dificultad esperada.
+
+    Returns:
+        float: Fitness del mapa.
+    """
+    return calculate_fitness(mapa, bfs(mapa), expected_dificulty)
