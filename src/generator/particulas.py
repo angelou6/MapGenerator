@@ -75,7 +75,7 @@ def particle_swarm(
     positions = rng.random(shape)
     velocities = rng.uniform(-max_velocity, max_velocity, shape)
 
-    maps = [discretize(position, rangos) for position in positions]
+    maps: list[NDArray[np.int32]] = [discretize(p, rangos) for p in positions]
     scores = np.array([evaluate(mapa, expected_dificulty, weights) for mapa in maps])
 
     pbest = positions.copy()
