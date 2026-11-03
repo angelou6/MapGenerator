@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+from itertools import combinations
 from typing import Annotated
 
 import numpy as np
@@ -316,3 +318,45 @@ def evaluate(mapa: NDArray[np.int32], expected_dificulty: int) -> float:
         float: Fitness del mapa.
     """
     return calculate_fitness(mapa, bfs(mapa), expected_dificulty)
+
+
+def calculate_hamming_distance(
+    mapa_a: NDArray[np.int32], mapa_b: NDArray[np.int32]
+) -> int:
+    """
+    Cuenta las casillas que son diferentes entre dos mapas (distancia de Hamming).
+
+    Args:
+        mapa_a: Array 2D de Numpy que representa el primer mapa.
+        mapa_b: Array 2D de Numpy que representa el segundo mapa.
+
+    Returns:
+        int: Número de casillas en las que ambos mapas difieren.
+
+    Raises:
+        ValueError: Si los mapas no tienen el mismo tamaño.
+    """
+    if mapa_a.shape != mapa_b.shape:
+        raise ValueError("Los mapas deben tener el mismo tamaño")
+
+    return int(np.count_nonzero(mapa_a != mapa_b))
+
+
+def calculate_average_diversity(mapas: Sequence[NDArray[np.int32]]) -> float:
+    """
+    Calcula la distancia de Hamming promedio entre todos los pares de mapas.
+
+    Sirve para medir qué tan distintos son los mapas generados (por ejemplo, la
+    población de un algoritmo o varias ejecuciones), sin modificar el fitness.
+
+    Args:
+        mapas: Secuencia de mapas a comparar.
+
+    Returns:
+        float: Promedio de casillas diferentes por par de mapas, o 0.0 si hay
+        menos de dos mapas.
+    """
+    distancias = [calculate_hamming_distance(a, b) for a, b in combinations(mapas, 2)]
+    if not distancias:
+        return 0.0
+    return float(np.mean(distancias))
