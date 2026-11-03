@@ -1,25 +1,44 @@
+"""
+Generador de mapas mediante Optimización por Enjambre de Partículas (PSO).
+
+Representa mapas en un espacio continuo donde cada partícula se desplaza según su inercia,
+su mejor posición individual y la mejor posición global del enjambre, discretizándose
+y reparándose para respetar las restricciones de cada escenario.
+"""
+
 import numpy as np
 from numpy.typing import NDArray
 
 from generator.map_utils import evaluate, repair
-from representation import MAP_SHAPE
+from generator.scenarios import get_scenario
+from representation import MAP_SHAPE, Elemento
 
 rng = np.random.default_rng()
 
-# Limites de los intervalos: [0, 0.70) libre, [0.70, 0.85) obstaculo,
+# Límites de los intervalos: [0, 0.70) libre, [0.70, 0.85) obstáculo,
 # [0.85, 0.95) enemigo y [0.95, 1] recompensa.
 THRESHOLDS = (0.70, 0.85, 0.95)
 
 
-def discretize(position: NDArray[np.float64]) -> NDArray[np.int32]:
+def discretize(
+    position: NDArray[np.float64],
+    rangos: dict[Elemento, tuple[int, int]] | None = None,
+) -> NDArray[np.int32]:
     """
-    Convierte la posicion continua de una particula en un mapa reparado.
+    Convierte la posición continua de una partícula en un mapa discreto reparado.
 
-    La posicion se usa como prioridad en la reparacion: si sobran elementos se
-    quitan los de valor mas bajo y si faltan se ponen donde el valor es mas alto.
+    La posición se usa como prioridad en la reparación: si sobran elementos se
+    quitan los de valor más bajo y si faltan se colocan donde el valor es más alto.
+
+    Args:
+        position: Array 2D de flotantes en [0, 1] con la posición continua de la partícula.
+        rangos: Diccionario opcional con los rangos permitidos para cada elemento.
+
+    Returns:
+        NDArray[np.int32]: Mapa discreto de enteros reparado conforme a los rangos.
     """
     mapa = np.digitize(position, THRESHOLDS).astype(np.int32)
-    return repair(mapa, position)
+    return repair(mapa, position, rangos)
 
 
 def particle_swarm(
@@ -30,12 +49,30 @@ def particle_swarm(
     c1: float = 1.5,
     c2: float = 1.5,
     max_velocity: float = 0.2,
+    escenario: str | None = None,
 ) -> NDArray[np.int32]:
+    """
+    Ejecuta la optimización por enjambre de partículas para encontrar un mapa óptimo.
+
+    Args:
+        expected_dificulty: Dificultad objetivo esperada para el mapa generado.
+        particles: Cantidad de partículas en el enjambre.
+        iterations: Número de iteraciones o pasos de actualización del enjambre.
+        inertia: Factor de inercia w sobre la velocidad anterior.
+        c1: Coeficiente cognitivo de atracción hacia la mejor posición individual.
+        c2: Coeficiente social de atracción hacia la mejor posición global.
+        max_velocity: Límite superior de velocidad para acotar los desplazamientos.
+        escenario: Nombre opcional del escenario para ajustar las restricciones y dificultad.
+
+    Returns:
+        NDArray[np.int32]: El mejor mapa encontrado por el enjambre de partículas.
+    """
+    rangos = get_scenario(escenario)["rangos"] if escenario is not None else None
     shape = (particles, *MAP_SHAPE)
     positions = rng.random(shape)
     velocities = rng.uniform(-max_velocity, max_velocity, shape)
 
-    maps = [discretize(position) for position in positions]
+    maps = [discretize(position, rangos) for position in positions]
     scores = np.array([evaluate(mapa, expected_dificulty) for mapa in maps])
 
     pbest = positions.copy()
@@ -58,7 +95,7 @@ def particle_swarm(
         positions = np.clip(positions + velocities, 0, 1)
 
         for i, position in enumerate(positions):
-            mapa = discretize(position)
+            mapa = discretize(position, rangos)
             score = evaluate(mapa, expected_dificulty)
 
             if score < pbest_scores[i]:

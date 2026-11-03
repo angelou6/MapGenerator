@@ -3,6 +3,7 @@ from typing import Annotated
 import numpy as np
 from numpy._typing import NDArray
 
+from generator.scenarios import DEFAULT_CONSTRAINTS, get_scenario
 from path_search.breadth import bfs, reachable_tiles
 from path_search.utils import get_ajacent_blockers
 from representation import MAP_SHAPE, Elemento
@@ -10,12 +11,8 @@ from representation import MAP_SHAPE, Elemento
 rng = np.random.default_rng()
 
 CONSTRAINTS: Annotated[
-    dict[Elemento, tuple[int, int]], "Rango de objectos posibles dentro del mapa."
-] = {
-    Elemento.OBSTACULO: (20, 35),
-    Elemento.ENEMIGO: (5, 10),
-    Elemento.RECOMPENZA: (3, 6),
-}
+    dict[Elemento, tuple[int, int]], "Rango de objetos posibles dentro del mapa."
+] = DEFAULT_CONSTRAINTS
 
 MOVABLE_MASK = np.ones(MAP_SHAPE, dtype=bool)
 MOVABLE_MASK[0, 0] = False
@@ -31,15 +28,22 @@ FANCY_ELEMENTOS = {
 }
 
 
-def generate_random_map() -> NDArray[np.int32]:
+def generate_random_map(escenario: str | None = None) -> NDArray[np.int32]:
     """
-    Genera un mapa aleatoreo.
+    Genera un mapa aleatorio.
+
+    Args:
+        escenario: Nombre opcional del escenario para ajustar las restricciones.
 
     Returns:
         NDArray[np.int32]: El mapa generado como array 15x15 de Numpy.
     """
+    rangos: dict[Elemento, tuple[int, int]] = CONSTRAINTS
+    if escenario is not None:
+        rangos = get_scenario(escenario)["rangos"]
+
     total = MAP_SHAPE[0] * MAP_SHAPE[1] - 2
-    counts = {val: rng.integers(lo, hi + 1) for val, (lo, hi) in CONSTRAINTS.items()}
+    counts = {val: rng.integers(lo, hi + 1) for val, (lo, hi) in rangos.items()}
     flat = np.zeros(total, dtype=int)
     items = np.repeat(list(counts.keys()), list(counts.values()))
 
@@ -51,10 +55,12 @@ def generate_random_map() -> NDArray[np.int32]:
 
 
 def repair(
-    mapa: NDArray[np.int32], priority: NDArray[np.float64] | None = None
+    mapa: NDArray[np.int32],
+    priority: NDArray[np.float64] | None = None,
+    rangos: dict[Elemento, tuple[int, int]] | None = None,
 ) -> NDArray[np.int32]:
     """
-    Repara el mapa para que respete los limites de CONSTRAINTS y que inicio y
+    Repara el mapa para que respete los limites de los rangos y que inicio y
     meta esten en su lugar.
 
     Si sobran elementos se quitan los de menor prioridad; si faltan se agregan
@@ -63,17 +69,20 @@ def repair(
     Args:
         mapa: Array 2D de Numpy que representa el mapa. Se modifica en el lugar.
         priority: Array 2D con la prioridad de cada celda.
+        rangos: Rangos de elementos a respetar. Si es None se usa CONSTRAINTS.
 
     Returns:
         NDArray[np.int32]: El mismo mapa ya reparado.
     """
     if priority is None:
         priority = rng.random(MAP_SHAPE)
+    if rangos is None:
+        rangos = CONSTRAINTS
 
     mapa[~MOVABLE_MASK] = Elemento.TRANSITABLE
     mapa[mapa > Elemento.RECOMPENZA] = Elemento.TRANSITABLE
 
-    for element, (lo, hi) in CONSTRAINTS.items():
+    for element, (lo, hi) in rangos.items():
         cells = np.argwhere(mapa == element)
         if len(cells) > hi:
             order = np.argsort(priority[cells[:, 0], cells[:, 1]])

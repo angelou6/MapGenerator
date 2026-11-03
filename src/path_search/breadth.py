@@ -56,7 +56,7 @@ def bfs(mapa: NDArray[np.int32]) -> list[tuple[int, int]] | None:
     Busca un camino posible dentro de un mapa usando breadth-first search.
 
     Args:
-        NDArray[np.int32]: El mapa generado como array 15x15 de Numpy.
+        mapa: Array 2D de Numpy que representa el mapa.
 
     Returns:
         list[tuple[int, int]] or None: Devuelve la ruta encontrada,

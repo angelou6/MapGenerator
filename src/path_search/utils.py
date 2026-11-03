@@ -9,6 +9,16 @@ from representation import BLOCKERS, MAP_SHAPE, Elemento
 def get_ajacent_blockers(
     mapa: NDArray[np.int32], path: list[tuple[int, int]]
 ) -> Counter[Elemento]:
+    """
+    Cuenta los elementos bloqueadores únicos adyacentes a las celdas de una ruta.
+
+    Args:
+        mapa: Array 2D de Numpy que representa el mapa.
+        path: Lista de coordenadas (fila, columna) que conforman la ruta a evaluar.
+
+    Returns:
+        Counter[Elemento]: Conteo de obstáculos y enemigos adyacentes a la ruta.
+    """
     shape = MAP_SHAPE[0]
     grid = mapa.tolist()
     registered: set[tuple[int, int]] = set()
