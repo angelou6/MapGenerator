@@ -116,11 +116,12 @@ def neighbor(
 
 def simulated_annealing(
     expected_dificulty: int,
-    steps: int = 10000,
+    steps: int = 5000,
     temperature: float = 50,
     cooling_rate: float = 0.999,
     escenario: str | None = None,
     weights: Weights = DEFAULT_WEIGHTS,
+    history: dict[str, list[float]] | None = None,
 ) -> NDArray[np.int32]:
     """
     Optimiza un mapa mediante el algoritmo de Recocido Simulado.
@@ -134,6 +135,8 @@ def simulated_annealing(
         cooling_rate: Factor de enfriamiento geométrico aplicado en cada paso.
         escenario: Nombre opcional del escenario para ajustar las restricciones y dificultad.
         weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
+        history: Diccionario opcional donde se guarda, por paso, el mejor fitness,
+            el fitness actual y la temperatura.
 
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado durante la optimización.
@@ -161,5 +164,9 @@ def simulated_annealing(
             if score < best_score:
                 best = candidate.copy()
                 best_score = score
+        if history is not None:
+            history.setdefault("mejor fitness", []).append(best_score)
+            history.setdefault("fitness actual", []).append(current_score)
+            history.setdefault("temperatura", []).append(temperature)
         temperature *= cooling_rate
     return best

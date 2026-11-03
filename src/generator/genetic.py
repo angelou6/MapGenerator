@@ -5,6 +5,7 @@ from generator.map_utils import (
     DEFAULT_WEIGHTS,
     MOVABLE_MASK,
     Weights,
+    calculate_average_diversity,
     evaluate,
     generate_random_map,
     repair,
@@ -102,6 +103,7 @@ def genetic_algorithm(
     elite_size: int = 2,
     escenario: str | None = None,
     weights: Weights = DEFAULT_WEIGHTS,
+    history: dict[str, list[float]] | None = None,
 ) -> NDArray[np.int32]:
     """
     Ejecuta el ciclo evolutivo del algoritmo genético para encontrar un mapa óptimo.
@@ -116,6 +118,8 @@ def genetic_algorithm(
         elite_size: Cantidad de mejores individuos conservados intactos por generación.
         escenario: Nombre opcional del escenario para ajustar las restricciones y dificultad.
         weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
+        history: Diccionario opcional donde se guarda, por generación, el mejor
+            fitness, el fitness mediano y la diversidad de la población.
 
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado al concluir todas las generaciones.
@@ -162,4 +166,10 @@ def genetic_algorithm(
         if scores[best_index] < best_score:
             best = population[best_index].copy()
             best_score = scores[best_index]
+        if history is not None:
+            history.setdefault("mejor fitness", []).append(best_score)
+            history.setdefault("fitness mediano", []).append(float(np.median(scores)))
+            history.setdefault("diversidad", []).append(
+                calculate_average_diversity(population)
+            )
     return best

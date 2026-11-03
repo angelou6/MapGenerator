@@ -1,7 +1,13 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from generator.map_utils import DEFAULT_WEIGHTS, Weights, evaluate, repair
+from generator.map_utils import (
+    DEFAULT_WEIGHTS,
+    Weights,
+    calculate_average_diversity,
+    evaluate,
+    repair,
+)
 from generator.scenarios import get_scenario
 from representation import MAP_SHAPE, Elemento
 
@@ -43,6 +49,7 @@ def particle_swarm(
     max_velocity: float = 0.2,
     escenario: str | None = None,
     weights: Weights = DEFAULT_WEIGHTS,
+    history: dict[str, list[float]] | None = None,
 ) -> NDArray[np.int32]:
     """
     Ejecuta la optimización por enjambre de partículas para encontrar un mapa óptimo.
@@ -57,6 +64,8 @@ def particle_swarm(
         max_velocity: Límite superior de velocidad para acotar los desplazamientos.
         escenario: Nombre opcional del escenario para ajustar las restricciones y dificultad.
         weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
+        history: Diccionario opcional donde se guarda, por iteración, el mejor
+            fitness, el fitness mediano y la diversidad del enjambre.
 
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado por el enjambre de partículas.
@@ -88,9 +97,12 @@ def particle_swarm(
         velocities = np.clip(velocities, -max_velocity, max_velocity)
         positions = np.clip(positions + velocities, 0, 1)
 
+        maps = []
         for i, position in enumerate(positions):
             mapa = discretize(position, rangos)
             score = evaluate(mapa, expected_dificulty, weights)
+            maps.append(mapa)
+            scores[i] = score
 
             if score < pbest_scores[i]:
                 pbest[i] = position
@@ -100,4 +112,10 @@ def particle_swarm(
                     gbest = position.copy()
                     best = mapa.copy()
                     best_score = score
+        if history is not None:
+            history.setdefault("mejor fitness", []).append(float(best_score))
+            history.setdefault("fitness mediano", []).append(float(np.median(scores)))
+            history.setdefault("diversidad", []).append(
+                calculate_average_diversity(maps)
+            )
     return best
