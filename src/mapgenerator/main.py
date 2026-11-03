@@ -198,12 +198,15 @@ def main():
     st_ini = est.estadisticas("Inicial", originales, rep_orig)
     print(f"Mapas viables en la generación inicial: {sum(r.viable for r in rep_orig)}/{n} "
           f"(viable = camino válido, cantidades en rango, sin recompensas encerradas ni enemigos "
-          f"aglomerados y dificultad a ±{TOLERANCIA_DIFICULTAD} del objetivo)")
+          f"aglomerados y dificultad a ±{TOLERANCIA_DIFICULTAD} del objetivo; el camino largo de "
+          f"Exploración se penaliza en el fitness pero no descalifica)")
     resumen_corto("Inicial", st_ini)
     print("Dibujando la cuadrícula de mapas iniciales...")
-    ruta = carpeta / "01_poblacion_inicial.png"
-    graficas.guardar_cuadricula(originales, rep_orig, configs,
-                                f"Población inicial ({n} mapas, preset: {nombre_preset})", ruta)
+    paginas = graficas.guardar_cuadricula_paginas(
+        originales, rep_orig, configs, f"Población inicial ({n} mapas, preset: {nombre_preset})",
+        carpeta, "01_poblacion_inicial")
+    ruta = carpeta / "01_poblacion_inicial.html"
+    graficas.guardar_galeria(paginas, f"Población inicial ({n} mapas)", ruta)
     graficas.abrir(ruta, abrir)
 
     # ------------------------------------------------------------ los tres algoritmos
@@ -217,9 +220,11 @@ def main():
         stats.append(st)
         print(f"   Tiempo: {res.tiempo:.1f} s · evaluaciones: {res.evaluaciones}")
         resumen_corto(clave, st)
-        ruta = carpeta / f"{k:02d}_comparacion_{clave}.png"
-        graficas.guardar_comparacion(originales, rep_orig, res.mapas, rep, configs, clave,
-                                     res.pareo, ruta)
+        prefijo = f"{k:02d}_comparacion_{clave}"
+        paginas = graficas.guardar_comparacion_paginas(
+            originales, rep_orig, res.mapas, rep, configs, clave, res.pareo, carpeta, prefijo)
+        ruta = carpeta / f"{prefijo}.html"
+        graficas.guardar_galeria(paginas, f"{clave}: original → resultado", ruta)
         graficas.abrir(ruta, abrir)
 
     # ------------------------------------------------------------ resultados finales

@@ -11,6 +11,7 @@ import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 
+from generator.evaluacion import CAMINO_LARGO_MIN
 from representation import Elemento
 
 COLORES = {
@@ -61,8 +62,9 @@ def dibujar_mapa(ax, mapa, ruta=None, viable=None):
 def _lineas(r):
     dif = "D = n/d (sin camino)" if r.dificultad is None else \
         f"D = {r.dificultad:.1f}  (objetivo {r.dificultad_obj}, desv. {abs(r.dificultad - r.dificultad_obj):.1f})"
+    largo = (f"  largo(≥{CAMINO_LARGO_MIN}): {'sí' if r.largo_ok else 'no'}" if r.exige_largo else "")
     return [
-        f"L={r.longitud}  E={r.enemigos_cerca}  P={r.obstaculos_cerca}  R={r.recompensas_acc}",
+        f"L={r.longitud}  E={r.enemigos_cerca}  P={r.obstaculos_cerca}  R={r.recompensas_acc}{largo}",
         dif,
         f"Obst {r.n_obstaculos} · Enem {r.n_enemigos} · Rec {r.n_recompensas}",
         f"P_cam {_fmt(r.p_camino, 0)} · P_dif {_fmt(r.p_dificultad)} · P_ene {_fmt(r.p_enemigos, 0)}",
@@ -99,13 +101,15 @@ def _leyenda(fig, x, y):
     fig.legend(handles=h, loc="upper center", ncol=7, bbox_to_anchor=(x, y), frameon=False, fontsize=9)
 
 
-def guardar_cuadricula(mapas, reportes, configs, titulo, ruta, columnas=3):
-    """Todos los mapas en una sola imagen (columnas x n filas) con su ficha de datos."""
+def guardar_cuadricula(mapas, reportes, configs, titulo, ruta, columnas=3, inicio=0, extra=None):
+    """Mapas en una imagen (columnas x filas) con su ficha de datos. `inicio` es el indice
+    global del primer mapa (para numerarlos bien en paginas) y `extra` el texto del encabezado."""
     W, H, CAB = 4.4, 5.3, 1.1
     fig, filas, ancho, alto = _lienzo(len(mapas), columnas, W, H, CAB)
-    viables = sum(r.viable for r in reportes)
-    fig.text(0.5, 1 - 0.28 / alto, f"{titulo}   ·   viables: {viables}/{len(mapas)} "
-             f"({100 * viables / len(mapas):.0f}%)", ha="center", fontsize=15, fontweight="bold")
+    if extra is None:
+        viables = sum(r.viable for r in reportes)
+        extra = f"viables: {viables}/{len(mapas)} ({100 * viables / len(mapas):.0f}%)"
+    fig.text(0.5, 1 - 0.28 / alto, f"{titulo}   ·   {extra}", ha="center", fontsize=14, fontweight="bold")
     _leyenda(fig, 0.5, 1 - 0.55 / alto)
     for i, (m, r) in enumerate(zip(mapas, reportes)):
         f, c = divmod(i, columnas)
@@ -114,7 +118,7 @@ def guardar_cuadricula(mapas, reportes, configs, titulo, ruta, columnas=3):
         dibujar_mapa(ax, m, r.ruta, r.viable)
         est, col = _estado(r)
         fig.text((x0 + 0.4) / ancho, (ytop - 0.12) / alto,
-                 f"Mapa #{i + 1}  [{configs[i].nombre}]", fontsize=9, fontweight="bold", va="center")
+                 f"Mapa #{inicio + i + 1}  [{configs[i].nombre}]", fontsize=9, fontweight="bold", va="center")
         fig.text((x0 + 4.0) / ancho, (ytop - 0.12) / alto, est, fontsize=9, fontweight="bold",
                  color=col, ha="right", va="center")
         fig.text((x0 + 0.4) / ancho, (ytop - 0.30) / alto, _motivo(r), fontsize=6.5, color=ROJO, va="center")
@@ -124,22 +128,24 @@ def guardar_cuadricula(mapas, reportes, configs, titulo, ruta, columnas=3):
     plt.close(fig)
 
 
-def guardar_comparacion(originales, rep_o, finales, rep_f, configs, nombre, pareo, ruta, columnas=3):
+def guardar_comparacion(originales, rep_o, finales, rep_f, configs, nombre, pareo, ruta,
+                        columnas=2, inicio=0, extra=None):
     """Cada celda: mapa original (izq) vs mapa tras el algoritmo (der), con sus datos."""
     W, H, CAB = 8.4, 5.3, 1.1
     fig, filas, ancho, alto = _lienzo(len(originales), columnas, W, H, CAB)
-    vo, vf = sum(r.viable for r in rep_o), sum(r.viable for r in rep_f)
     n = len(originales)
-    extra = "  (AG: parejas por ranking de fitness)" if pareo == "ranking" else ""
-    fig.text(0.5, 1 - 0.28 / alto,
-             f"{nombre}: original → resultado   ·   viables {vo}/{n} → {vf}/{n}{extra}",
-             ha="center", fontsize=15, fontweight="bold")
+    if extra is None:
+        extra = f"viables {sum(r.viable for r in rep_o)}/{n} → {sum(r.viable for r in rep_f)}/{n}"
+    if pareo == "ranking":
+        extra += "  (AG: parejas por ranking de fitness)"
+    fig.text(0.5, 1 - 0.28 / alto, f"{nombre}: original → resultado   ·   {extra}",
+             ha="center", fontsize=14, fontweight="bold")
     _leyenda(fig, 0.5, 1 - 0.55 / alto)
     for i in range(n):
         f, c = divmod(i, columnas)
         x0, ytop = c * W, alto - CAB - f * H
         fig.text((x0 + 4.2) / ancho, (ytop - 0.12) / alto,
-                 f"Mapa #{i + 1} [{configs[i].nombre}]   f(X): {_fmt(rep_o[i].fitness)} → {_fmt(rep_f[i].fitness)}",
+                 f"Mapa #{inicio + i + 1} [{configs[i].nombre}]   f(X): {_fmt(rep_o[i].fitness)} → {_fmt(rep_f[i].fitness)}",
                  fontsize=9, fontweight="bold", ha="center", va="center")
         for j, (mp, r, etiqueta) in enumerate(((originales[i], rep_o[i], "ORIGINAL"),
                                                (finales[i], rep_f[i], nombre))):
@@ -153,6 +159,56 @@ def guardar_comparacion(originales, rep_o, finales, rep_f, configs, nombre, pare
                 fig.text(xo / ancho, (ytop - 4.05 - k * 0.17) / alto, linea, fontsize=6.4, va="center")
     fig.savefig(ruta)
     plt.close(fig)
+
+
+def guardar_cuadricula_paginas(mapas, reportes, configs, titulo, carpeta, prefijo,
+                               por_pagina=12, columnas=3):
+    """Divide la poblacion en paginas legibles (por defecto 12 mapas = 3x4). Devuelve las rutas."""
+    n = len(mapas)
+    viables = sum(r.viable for r in reportes)
+    extra = f"viables en toda la población: {viables}/{n} ({100 * viables / n:.0f}%)"
+    paginas = math.ceil(n / por_pagina)
+    rutas = []
+    for p in range(paginas):
+        a, b = p * por_pagina, min(n, (p + 1) * por_pagina)
+        ruta = carpeta / f"{prefijo}_p{p + 1:02d}.png"
+        guardar_cuadricula(mapas[a:b], reportes[a:b], configs[a:b],
+                           f"{titulo} · mapas {a + 1}-{b} (pág. {p + 1}/{paginas})", ruta,
+                           columnas, inicio=a, extra=extra)
+        rutas.append(ruta)
+    return rutas
+
+
+def guardar_comparacion_paginas(originales, rep_o, finales, rep_f, configs, nombre, pareo,
+                                carpeta, prefijo, por_pagina=6, columnas=2):
+    """Igual que guardar_cuadricula_paginas pero con parejas original -> resultado (6 por pagina)."""
+    n = len(originales)
+    extra = (f"viables en toda la población: {sum(r.viable for r in rep_o)}/{n} → "
+             f"{sum(r.viable for r in rep_f)}/{n}")
+    paginas = math.ceil(n / por_pagina)
+    rutas = []
+    for p in range(paginas):
+        a, b = p * por_pagina, min(n, (p + 1) * por_pagina)
+        ruta = carpeta / f"{prefijo}_p{p + 1:02d}.png"
+        guardar_comparacion(originales[a:b], rep_o[a:b], finales[a:b], rep_f[a:b], configs[a:b],
+                            nombre, pareo, ruta, columnas, inicio=a,
+                            extra=f"{extra}  ·  pág. {p + 1}/{paginas}")
+        rutas.append(ruta)
+    return rutas
+
+
+def guardar_galeria(paginas, titulo, ruta_html):
+    """Un index.html que apila todas las paginas (scroll + zoom del navegador)."""
+    n = len(paginas)
+    nav = " · ".join(f'<a href="#p{i}">{i}</a>' for i in range(1, n + 1))
+    cuerpo = "\n".join(f'<h3 id="p{i}">Página {i}/{n}</h3><img src="{p.name}" loading="lazy">'
+                       for i, p in enumerate(paginas, 1))
+    html = ("<!doctype html><html><head><meta charset='utf-8'>"
+            f"<title>{titulo}</title><style>body{{font-family:sans-serif;background:#2b2b2b;"
+            "color:#eee;margin:0;padding:16px}}img{{max-width:100%;height:auto;display:block;"
+            "margin:0 auto 32px;background:#fff}}h1,h3,p{{text-align:center}}a{{color:#8ab4f8}}"
+            f"</style></head><body><h1>{titulo}</h1><p>{nav}</p>{cuerpo}</body></html>")
+    ruta_html.write_text(html, encoding="utf-8")
 
 
 def guardar_convergencia(resultados, ruta, titulo="Convergencia del fitness"):

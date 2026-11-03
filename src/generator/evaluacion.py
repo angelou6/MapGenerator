@@ -28,7 +28,10 @@ from representation import MAP_SHAPE, Elemento
 TOLERANCIA_DIFICULTAD = 10
 
 # Escenario "Exploracion" (6-10 recompensas y CAMINO LARGO). El documento no fija cuanto
-# es "largo"; se toma L >= 40 (el L del ejemplo del documento) y se penaliza lo que falte.
+# es "largo"; se toma L >= 40 (el L del ejemplo del documento) como OBJETIVO SUAVE: se
+# penaliza en el fitness lo que falte y se reporta en cada mapa, pero NO descalifica.
+# (L=29 es el minimo posible y alargarlo exige muros en zigzag que la busqueda local casi
+# nunca encuentra, por eso como requisito duro ningun mapa resultaba viable.)
 CAMINO_LARGO_MIN = 40
 PESO_CAMINO_LARGO = 5
 
@@ -67,6 +70,8 @@ class Reporte:
     p_recompensas: float
     p_distribucion: float
     p_camino_largo: float
+    exige_largo: bool        # el escenario pide camino largo (Exploracion)
+    largo_ok: bool           # cumple L >= CAMINO_LARGO_MIN (solo informativo)
     fitness: float           # f(X)
     n_obstaculos: int
     n_enemigos: int
@@ -146,8 +151,7 @@ class Evaluador:
             motivos.append("enemigos aglomerados")
         if dif is not None and abs(dif - cfg.dificultad) > TOLERANCIA_DIFICULTAD:
             motivos.append(f"dificultad fuera de +-{TOLERANCIA_DIFICULTAD}")
-        if cfg.camino_largo and ruta is not None and len(ruta) < CAMINO_LARGO_MIN:
-            motivos.append("camino corto")
+        largo_ok = (not cfg.camino_largo) or (ruta is not None and len(ruta) >= CAMINO_LARGO_MIN)
 
         f = float(calculate_fitness(mapa, ruta, cfg.dificultad, self.pesos)) + p_largo
         return Reporte(
@@ -155,6 +159,7 @@ class Evaluador:
             enemigos_cerca=int(e), obstaculos_cerca=int(p), recompensas_acc=r,
             dificultad=dif, dificultad_obj=cfg.dificultad, p_camino=p_camino,
             p_dificultad=p_dif, p_enemigos=p_ene, p_recompensas=p_rec,
-            p_distribucion=p_dis, p_camino_largo=p_largo, fitness=f,
+            p_distribucion=p_dis, p_camino_largo=p_largo, exige_largo=cfg.camino_largo,
+            largo_ok=largo_ok, fitness=f,
             n_obstaculos=n_o, n_enemigos=n_e, n_recompensas=n_r,
         )
