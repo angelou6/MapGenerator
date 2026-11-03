@@ -1,10 +1,3 @@
-"""
-Generador de mapas mediante Recocido Simulado (Simulated Annealing).
-
-Implementa perturbaciones locales sobre el mapa (intercambio y adición o eliminación
-de elementos dentro de los rangos permitidos) guiadas por una temperatura geométrica decreciente.
-"""
-
 import math
 
 import numpy as np
@@ -12,7 +5,9 @@ from numpy.typing import NDArray
 
 from generator.map_utils import (
     CONSTRAINTS,
+    DEFAULT_WEIGHTS,
     MOVABLE_MASK,
+    Weights,
     evaluate,
     generate_random_map,
 )
@@ -125,6 +120,7 @@ def simulated_annealing(
     temperature: float = 50,
     cooling_rate: float = 0.999,
     escenario: str | None = None,
+    weights: Weights = DEFAULT_WEIGHTS,
 ) -> NDArray[np.int32]:
     """
     Optimiza un mapa mediante el algoritmo de Recocido Simulado.
@@ -132,26 +128,33 @@ def simulated_annealing(
     Args:
         expected_dificulty: Dificultad objetivo esperada para el mapa.
         steps: Número máximo de pasos o iteraciones de enfriamiento.
-        temperature: Temperatura inicial del sistema.
+        temperature: Temperatura inicial del sistema, calibrada para DEFAULT_WEIGHTS.
+            Se escala proporcionalmente a la suma de los pesos para que la
+            probabilidad de aceptación no dependa de la magnitud de los pesos.
         cooling_rate: Factor de enfriamiento geométrico aplicado en cada paso.
         escenario: Nombre opcional del escenario para ajustar las restricciones y dificultad.
+        weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
 
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado durante la optimización.
     """
     rangos = get_scenario(escenario)["rangos"] if escenario is not None else None
+    temperature *= sum(weights) / sum(DEFAULT_WEIGHTS)
+
     current = generate_random_map(escenario)
-    current_score = evaluate(current, expected_dificulty)
+    current_score = evaluate(current, expected_dificulty, weights)
 
     best = current.copy()
     best_score = current_score
 
     for _ in range(steps):
         candidate = neighbor(current, rangos)
-        score = evaluate(candidate, expected_dificulty)
+        score = evaluate(candidate, expected_dificulty, weights)
 
         delta = score - current_score
-        if delta <= 0 or rng.random() < math.exp(-delta / temperature):
+        if delta <= 0 or (
+            temperature > 0 and rng.random() < math.exp(-delta / temperature)
+        ):
             current = candidate
             current_score = score
 

@@ -1,15 +1,7 @@
-"""
-Generador de mapas mediante Optimización por Enjambre de Partículas (PSO).
-
-Representa mapas en un espacio continuo donde cada partícula se desplaza según su inercia,
-su mejor posición individual y la mejor posición global del enjambre, discretizándose
-y reparándose para respetar las restricciones de cada escenario.
-"""
-
 import numpy as np
 from numpy.typing import NDArray
 
-from generator.map_utils import evaluate, repair
+from generator.map_utils import DEFAULT_WEIGHTS, Weights, evaluate, repair
 from generator.scenarios import get_scenario
 from representation import MAP_SHAPE, Elemento
 
@@ -50,6 +42,7 @@ def particle_swarm(
     c2: float = 1.5,
     max_velocity: float = 0.2,
     escenario: str | None = None,
+    weights: Weights = DEFAULT_WEIGHTS,
 ) -> NDArray[np.int32]:
     """
     Ejecuta la optimización por enjambre de partículas para encontrar un mapa óptimo.
@@ -63,6 +56,7 @@ def particle_swarm(
         c2: Coeficiente social de atracción hacia la mejor posición global.
         max_velocity: Límite superior de velocidad para acotar los desplazamientos.
         escenario: Nombre opcional del escenario para ajustar las restricciones y dificultad.
+        weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
 
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado por el enjambre de partículas.
@@ -73,7 +67,7 @@ def particle_swarm(
     velocities = rng.uniform(-max_velocity, max_velocity, shape)
 
     maps = [discretize(position, rangos) for position in positions]
-    scores = np.array([evaluate(mapa, expected_dificulty) for mapa in maps])
+    scores = np.array([evaluate(mapa, expected_dificulty, weights) for mapa in maps])
 
     pbest = positions.copy()
     pbest_scores = scores.copy()
@@ -96,7 +90,7 @@ def particle_swarm(
 
         for i, position in enumerate(positions):
             mapa = discretize(position, rangos)
-            score = evaluate(mapa, expected_dificulty)
+            score = evaluate(mapa, expected_dificulty, weights)
 
             if score < pbest_scores[i]:
                 pbest[i] = position

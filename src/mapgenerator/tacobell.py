@@ -63,13 +63,13 @@ def diversidad(ejecuciones: int = 5, dificultad: int = 40):
 
 
 def main():
-    diversidad()
+    # diversidad()
     # normal()
-    # final = simulated_annealing(40)
-    # print("penalizacion enemigos:", calculate_enemy_penalty(final))
-    # print("pene recompenza:", calculate_reward_penalty(final))
-    # solution = bfs(final)
-    # if solution is not None:
-    #     print("dificulty:", get_dificulty(final, solution))
-    # fancy_print(final)
+    final = simulated_annealing(40)
+    print("penalizacion enemigos:", calculate_enemy_penalty(final))
+    print("pene recompenza:", calculate_reward_penalty(final))
+    solution = bfs(final)
+    if solution is not None:
+        print("dificulty:", get_dificulty(final, solution))
+    fancy_print(final)
     # print(mapa.tolist())

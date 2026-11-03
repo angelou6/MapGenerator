@@ -1,16 +1,10 @@
-"""
-Generador de mapas mediante Algoritmo Genético.
-
-Evoluciona una población de mapas representados como matrices de 15x15 utilizando
-selección por torneo, cruces cromosómicos (por dos puntos o por bloques de 5x5),
-mutaciones puntuales y reparación de restricciones con elitismo.
-"""
-
 import numpy as np
 from numpy.typing import NDArray
 
 from generator.map_utils import (
+    DEFAULT_WEIGHTS,
     MOVABLE_MASK,
+    Weights,
     evaluate,
     generate_random_map,
     repair,
@@ -107,6 +101,7 @@ def genetic_algorithm(
     mutation_rate: float = 0.01,
     elite_size: int = 2,
     escenario: str | None = None,
+    weights: Weights = DEFAULT_WEIGHTS,
 ) -> NDArray[np.int32]:
     """
     Ejecuta el ciclo evolutivo del algoritmo genético para encontrar un mapa óptimo.
@@ -120,6 +115,7 @@ def genetic_algorithm(
         mutation_rate: Tasa de mutación aleatoria por celda.
         elite_size: Cantidad de mejores individuos conservados intactos por generación.
         escenario: Nombre opcional del escenario para ajustar las restricciones y dificultad.
+        weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
 
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado al concluir todas las generaciones.
@@ -128,7 +124,9 @@ def genetic_algorithm(
     population: list[NDArray[np.int32]] = [
         generate_random_map(escenario) for _ in range(population_size)
     ]
-    scores: list[float] = [evaluate(mapa, expected_dificulty) for mapa in population]
+    scores: list[float] = [
+        evaluate(mapa, expected_dificulty, weights) for mapa in population
+    ]
 
     best_index = int(np.argmin(scores))
     best = population[best_index].copy()
@@ -155,7 +153,7 @@ def genetic_algorithm(
             _ = repair(child, rangos=rangos)
 
             offspring.append(child)
-            offspring_scores.append(evaluate(child, expected_dificulty))
+            offspring_scores.append(evaluate(child, expected_dificulty, weights))
 
         population = offspring
         scores = offspring_scores
