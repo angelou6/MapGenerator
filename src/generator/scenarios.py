@@ -36,13 +36,14 @@ SCENARIOS: dict[str, _ScenarioDef] = {
 }
 
 
-def get_scenario(nombre: str) -> ScenarioConfig:
+def get_scenario(nombre: str | None) -> ScenarioConfig:
     """
     Obtiene la configuración y restricciones del escenario especificado.
 
     Args:
         nombre: Nombre del escenario a consultar (facil, medio, dificil,
-            laberinto, combate o exploracion).
+            laberinto, combate o exploracion). Si es None se devuelve la
+            configuración predeterminada.
 
     Returns:
         ScenarioConfig: Diccionario con la dificultad objetivo, los rangos de
@@ -51,13 +52,17 @@ def get_scenario(nombre: str) -> ScenarioConfig:
     Raises:
         ValueError: Si el nombre del escenario no existe en SCENARIOS.
     """
-    nombre = nombre.strip().lower()
-    if nombre not in SCENARIOS:
-        raise ValueError(
-            f"Escenario desconocido: '{nombre}'. Opciones disponibles: {', '.join(SCENARIOS)}"
-        )
+    if nombre is None:
+        config: _ScenarioDef = {}
+    else:
+        nombre = nombre.strip().lower()
+        if nombre not in SCENARIOS:
+            raise ValueError(
+                f"Escenario desconocido: '{nombre}'. "
+                + f"Opciones disponibles: {', '.join(SCENARIOS)}"
+            )
+        config = SCENARIOS[nombre]
 
-    config = SCENARIOS[nombre]
     rangos: Rangos = DEFAULT_CONSTRAINTS.copy()
     rangos.update(config.get("rangos", {}))
 

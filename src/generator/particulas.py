@@ -70,13 +70,17 @@ def particle_swarm(
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado por el enjambre de partículas.
     """
-    rangos = get_scenario(escenario)["rangos"] if escenario is not None else None
+    config = get_scenario(escenario)
+    rangos = config["rangos"]
+    camino_largo = config["camino_largo"]
     shape = (particles, *MAP_SHAPE)
     positions = rng.random(shape)
     velocities = rng.uniform(-max_velocity, max_velocity, shape)
 
     maps: list[NDArray[np.int32]] = [discretize(p, rangos) for p in positions]
-    scores = np.array([evaluate(mapa, expected_dificulty, weights) for mapa in maps])
+    scores = np.array(
+        [evaluate(mapa, expected_dificulty, weights, camino_largo) for mapa in maps]
+    )
 
     pbest = positions.copy()
     pbest_scores = scores.copy()
@@ -100,7 +104,7 @@ def particle_swarm(
         maps = []
         for i, position in enumerate(positions):
             mapa = discretize(position, rangos)
-            score = evaluate(mapa, expected_dificulty, weights)
+            score = evaluate(mapa, expected_dificulty, weights, camino_largo)
             maps.append(mapa)
             scores[i] = score
 

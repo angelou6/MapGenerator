@@ -21,6 +21,15 @@ Weights = tuple[float, float, float, float, float]
 # Pesos predeterminados para el fitness. Se cambian al llamar la funcion sin tener que editar estos valores
 DEFAULT_WEIGHTS: Weights = (50, 10, 3, 5, 2)
 
+WEIGHT_PRESETS: dict[str, Weights] = {
+    "default": DEFAULT_WEIGHTS,
+    "jugabilidad": (100, 10, 5, 5, 2),
+    "dificultad": (50, 30, 5, 5, 2),
+    "distribucion": (50, 10, 15, 15, 10),
+}
+
+LONG_PATH_LENGTH = 40
+
 MOVABLE_MASK = np.ones(MAP_SHAPE, dtype=bool)
 MOVABLE_MASK[0, 0] = False
 MOVABLE_MASK[-1, -1] = False
@@ -117,6 +126,32 @@ def fancy_print(mapa: NDArray[np.int32]):
         for element in row:
             print(FANCY_ELEMENTOS[Elemento(element)], end=" ")
         print()
+
+
+def is_valid(
+    mapa: NDArray[np.int32],
+    rangos: dict[Elemento, tuple[int, int]] | None = None,
+) -> bool:
+    """
+    Indica si el mapa es un nivel válido: existe un camino de inicio a meta,
+    inicio y meta están en su lugar y la cantidad de cada elemento respeta los
+    rangos.
+
+    Args:
+        mapa: Array 2D de Numpy que representa el mapa.
+        rangos: Rangos de elementos a respetar. Si es None se usa CONSTRAINTS.
+
+    Returns:
+        bool: True si el nivel es jugable y respeta las restricciones.
+    """
+    if rangos is None:
+        rangos = CONSTRAINTS
+    if mapa[0, 0] != Elemento.INICIO or mapa[-1, -1] != Elemento.META:
+        return False
+    for element, (lo, hi) in rangos.items():
+        if not lo <= np.count_nonzero(mapa == element) <= hi:
+            return False
+    return bfs(mapa) is not None
 
 
 def get_close_elements(
@@ -220,18 +255,28 @@ def calculate_distrubution_penalty(mapa: NDArray[np.int32]) -> int:
     return int(penalizacion)
 
 
-def calculate_path_penalty(solution: list[tuple[int, int]] | None) -> int:
+def calculate_path_penalty(
+    solution: list[tuple[int, int]] | None, camino_largo: bool = False
+) -> int:
     """
     Calcula la penalización del camino, lee el documento para más información.
 
+    Sin camino la penalización es 10000. Si el escenario pide un camino largo
+    (exploración) se suma además la cantidad de celdas que le faltan al camino
+    para llegar a LONG_PATH_LENGTH.
+
     Args:
-        mapa: Array 2D de Numpy que representa el mapa.
         solution: Solución directa del algoritmo de busqueda.
+        camino_largo: Si se debe penalizar un camino demasiado corto.
 
     Returns:
         int: Penalización del camino.
     """
-    return 10000 if solution is None else 0
+    if solution is None:
+        return 10000
+    if camino_largo:
+        return max(0, LONG_PATH_LENGTH - len(solution))
+    return 0
 
 
 def get_dificulty(mapa: NDArray[np.int32], solution: list[tuple[int, int]]) -> float:
@@ -280,6 +325,7 @@ def calculate_fitness(
     solution: list[tuple[int, int]] | None,
     expected_dificulty: int,
     weights: Weights = DEFAULT_WEIGHTS,
+    camino_largo: bool = False,
 ) -> float:
     """
     Calcula el fitness del mapa.
@@ -289,14 +335,13 @@ def calculate_fitness(
         solution: Solución valida del algoritmo de busqueda.
         expected_dificulty: Dificultad esperada.
         weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
+        camino_largo: Si se penalizan los caminos cortos (escenario exploración).
 
     Returns:
         float: Fitness del mapa.
     """
     w1, w2, w3, w4, w5 = weights
-    p_camino = calculate_path_penalty(solution)
-    # Sin camino la dificultad no está definida; ese caso ya lo castiga
-    # p_camino (controlado por w1), así no se mezcla con el peso w2.
+    p_camino = calculate_path_penalty(solution, camino_largo)
     p_dificultad = (
         calculate_dificulty_penalty(mapa, solution, expected_dificulty)
         if solution is not None
@@ -319,6 +364,7 @@ def evaluate(
     mapa: NDArray[np.int32],
     expected_dificulty: int,
     weights: Weights = DEFAULT_WEIGHTS,
+    camino_largo: bool = False,
 ) -> float:
     """
     Busca el camino del mapa con BFS y calcula su fitness.
@@ -327,11 +373,12 @@ def evaluate(
         mapa: Array 2D de Numpy que representa el mapa.
         expected_dificulty: Dificultad esperada.
         weights: Pesos del fitness. Por defecto usa DEFAULT_WEIGHTS.
+        camino_largo: Si se penalizan los caminos cortos (escenario exploración).
 
     Returns:
         float: Fitness del mapa.
     """
-    return calculate_fitness(mapa, bfs(mapa), expected_dificulty, weights)
+    return calculate_fitness(mapa, bfs(mapa), expected_dificulty, weights, camino_largo)
 
 
 def calculate_hamming_distance(

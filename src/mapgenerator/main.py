@@ -8,6 +8,7 @@ from generator.filete import simulated_annealing
 from generator.genetic import genetic_algorithm
 from generator.map_utils import (
     DEFAULT_WEIGHTS,
+    WEIGHT_PRESETS,
     Weights,
     calculate_distrubution_penalty,
     calculate_enemy_penalty,
@@ -37,18 +38,23 @@ def data_print(
     escenario: str | None = None,
     weights: Weights = DEFAULT_WEIGHTS,
 ) -> None:
+    camino_largo = get_scenario(escenario)["camino_largo"]
+
     final = callback(dificulty, escenario=escenario, weights=weights)
     print("Penalización enemigos:", calculate_enemy_penalty(final))
     print("Penalización recompensa:", calculate_reward_penalty(final))
     print("Penalización distribución:", calculate_distrubution_penalty(final))
     solution = bfs(final)
+    print("Penalización camino:", calculate_path_penalty(solution, camino_largo))
     if solution is not None:
         print("Dificultad:", get_dificulty(final, solution))
         print("Longitud camino:", len(solution))
     else:
-        print("Penalización camino:", calculate_path_penalty(solution))
         print("Dificultad: Sin camino a la meta")
-    print("Fitness total:", calculate_fitness(final, solution, dificulty, weights))
+    print(
+        "Fitness total:",
+        calculate_fitness(final, solution, dificulty, weights, camino_largo),
+    )
     fancy_print(final)
 
 
@@ -75,13 +81,19 @@ def main() -> None:
         metavar=("CAMINO", "DIFICULTAD", "ENEMIGOS", "RECOMPENSAS", "DISTRIBUCION"),
         help="Pesos del fitness (por defecto: %(default)s)",
     )
+    _ = parser.add_argument(
+        "--prioridad",
+        choices=WEIGHT_PRESETS,
+        help="Usa los pesos de un experimento de la sección 15 (ignora --pesos)",
+    )
     _ = parser.add_argument("--escenario", choices=SCENARIOS, help="Escenario")
 
     args = parser.parse_args()
 
     if any(p < 0 for p in args.pesos):
         parser.error("Los pesos del fitness no pueden ser negativos")
-    camino, dificultad_w, enemigos, recompensas, distribucion = args.pesos
+    pesos = WEIGHT_PRESETS[args.prioridad] if args.prioridad else args.pesos
+    camino, dificultad_w, enemigos, recompensas, distribucion = pesos
     weights: Weights = (camino, dificultad_w, enemigos, recompensas, distribucion)
 
     dificultad: int | None = args.dificultad

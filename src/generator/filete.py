@@ -141,18 +141,20 @@ def simulated_annealing(
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado durante la optimización.
     """
-    rangos = get_scenario(escenario)["rangos"] if escenario is not None else None
+    config = get_scenario(escenario)
+    rangos = config["rangos"]
+    camino_largo = config["camino_largo"]
     temperature *= sum(weights) / sum(DEFAULT_WEIGHTS)
 
     current = generate_random_map(escenario)
-    current_score = evaluate(current, expected_dificulty, weights)
+    current_score = evaluate(current, expected_dificulty, weights, camino_largo)
 
     best = current.copy()
     best_score = current_score
 
     for _ in range(steps):
         candidate = neighbor(current, rangos)
-        score = evaluate(candidate, expected_dificulty, weights)
+        score = evaluate(candidate, expected_dificulty, weights, camino_largo)
 
         delta = score - current_score
         if delta <= 0 or (

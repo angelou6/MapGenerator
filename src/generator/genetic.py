@@ -124,12 +124,14 @@ def genetic_algorithm(
     Returns:
         NDArray[np.int32]: El mejor mapa encontrado al concluir todas las generaciones.
     """
-    rangos = get_scenario(escenario)["rangos"] if escenario is not None else None
+    config = get_scenario(escenario)
+    rangos = config["rangos"]
+    camino_largo = config["camino_largo"]
     population: list[NDArray[np.int32]] = [
         generate_random_map(escenario) for _ in range(population_size)
     ]
     scores: list[float] = [
-        evaluate(mapa, expected_dificulty, weights) for mapa in population
+        evaluate(mapa, expected_dificulty, weights, camino_largo) for mapa in population
     ]
 
     best_index = int(np.argmin(scores))
@@ -157,7 +159,9 @@ def genetic_algorithm(
             _ = repair(child, rangos=rangos)
 
             offspring.append(child)
-            offspring_scores.append(evaluate(child, expected_dificulty, weights))
+            offspring_scores.append(
+                evaluate(child, expected_dificulty, weights, camino_largo)
+            )
 
         population = offspring
         scores = offspring_scores
