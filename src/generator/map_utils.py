@@ -36,16 +36,25 @@ FANCY_ELEMENTOS = {
 }
 
 
-def generate_random_map(escenario: str | None = None) -> NDArray[np.int32]:
+def generate_random_map(
+    escenario: str | dict[Elemento, tuple[int, int]] | None = None,
+) -> NDArray[np.int32]:
     """
     Genera un mapa aleatoreo.
+
+    Args:
+        escenario: Nombre de un escenario (ver scenarios.py), un diccionario de
+            rangos {Elemento: (min, max)} (presets personalizados) o None para
+            usar los rangos normales del documento.
 
     Returns:
         NDArray[np.int32]: El mapa generado como array 15x15 de Numpy.
     """
     #deja elegir los rangos del escenario sin modificar los rangos originales
     rangos = CONSTRAINTS
-    if escenario is not None:
+    if isinstance(escenario, dict):
+        rangos = escenario
+    elif escenario is not None:
         from generator.scenarios import get_scenario
 
         rangos = get_scenario(escenario)["rangos"]
@@ -212,7 +221,8 @@ def get_difficulty(mapa: NDArray[np.int32], solution: list[tuple[int, int]]) -> 
     blockers = get_ajacent_blockers(mapa, solution)
     adjacent_enemies = blockers[Elemento.ENEMIGO]
     adjacent_obstacles = blockers[Elemento.OBSTACULO]
-    available_rewards = np.count_nonzero(mapa == Elemento.RECOMPENZA)
+    #el documento define R como recompensas accesibles (no las encerradas)
+    available_rewards = count_accesible_rewards(mapa)
 
     return (
         5 * adjacent_enemies
@@ -276,68 +286,51 @@ def calculate_fitness(
         + w5 * p_distribucion
     )
 
-#Oswaldo nuevamente hace acto de presencia, esta vez sin hambre de comida, pero con hambre de exito
-def reparar_cantidad_elemento(matriz_mapa, caracter_elemento, limite_minimo, limite_maximo):
+def reparar_cantidad_elemento(matriz_mapa, elemento, limite_minimo, limite_maximo):
     """
-    Oswaldo decidio ajustar los elementos, que estan representados por caracteres ('#', 'E', 'R') 
-    para que cumplan con los limites que se establecieron, Oswaldo garantiza que el inicio y la meta
-    no se moveran durante este proceso, pero no garantiza que el precio de la tortilla deje de subir
+    Ajusta (en el mismo arreglo) la cantidad de un elemento para que quede dentro de
+    [limite_minimo, limite_maximo]. Si sobran, convierte algunos al azar en espacio
+    transitable; si faltan, coloca el elemento en espacios transitables al azar.
+    El inicio (0,0) y la meta (14,14) nunca se tocan.
 
-    El poder de Oswaldo es muy limitado
-
+    Args:
+        matriz_mapa: Mapa como array 2D de Numpy con los codigos enteros de Elemento.
+        elemento: Codigo del elemento a reparar (Elemento.OBSTACULO, etc.).
+        limite_minimo: Cantidad minima permitida.
+        limite_maximo: Cantidad maxima permitida.
     """
-    coordenadas_del_elemento = []
-    coordenadas_vacias = []
+    elemento = int(elemento)
+    movible = np.ones(MAP_SHAPE, dtype=bool)
+    movible[0, 0] = False
+    movible[-1, -1] = False
 
-    # Oswaldo decide escanear el mapa y guardar las coordenadas de todos los elementos y espacios vacios
-    for fila in range(len(matriz_mapa)):
-        for columna in range(len(matriz_mapa[0])):
-            if matriz_mapa[fila][columna] == caracter_elemento:
-                coordenadas_del_elemento.append((fila, columna))
-            elif matriz_mapa[fila][columna] == '.':
-                coordenadas_vacias.append((fila, columna))
-                
-    cantidad_actual = len(coordenadas_del_elemento)
-    
-    # A oswaldo no le gustan los excesos, asi que si los hay, convertimos elementos sobrantes 
-    # en espacios vacíos al azar
-    while cantidad_actual > limite_maximo and coordenadas_del_elemento:
-        fila_elegida, columna_elegida = random.choice(coordenadas_del_elemento)
-        matriz_mapa[fila_elegida][columna_elegida] = '.'
-        coordenadas_del_elemento.remove((fila_elegida, columna_elegida))
-        coordenadas_vacias.append((fila_elegida, columna_elegida))
-        cantidad_actual -= 1
-        
-    # Si hay algo que oswaldo odie mas que los excesos, es la escasez, y si encontramos una,
-    # tomamos espacios vacíos al azar y agregamos el elemento
+    posiciones = np.argwhere(movible & (matriz_mapa == elemento))
+    exceso = len(posiciones) - limite_maximo
+    if exceso > 0:
+        for idx in rng.choice(len(posiciones), size=exceso, replace=False):
+            matriz_mapa[tuple(posiciones[idx])] = Elemento.TRANSITABLE
+        return matriz_mapa
 
-    while cantidad_actual < limite_minimo and coordenadas_vacias:
-        fila_elegida, columna_elegida = random.choice(coordenadas_vacias)
-        matriz_mapa[fila_elegida][columna_elegida] = caracter_elemento
-        coordenadas_vacias.remove((fila_elegida, columna_elegida))
-        coordenadas_del_elemento.append((fila_elegida, columna_elegida))
-        cantidad_actual += 1
-        
+    faltante = limite_minimo - len(posiciones)
+    if faltante > 0:
+        libres = np.argwhere(movible & (matriz_mapa == Elemento.TRANSITABLE))
+        faltante = min(faltante, len(libres))
+        if faltante > 0:
+            for idx in rng.choice(len(libres), size=faltante, replace=False):
+                matriz_mapa[tuple(libres[idx])] = elemento
     return matriz_mapa
 
-def reparar_mapa_completo(matriz_mapa):
+
+def reparar_mapa_completo(matriz_mapa, rangos=None):
     """
-    Oswaldo es un hombre que necesita seguridad, por lo tanto, decidio implementar esta seccion de codigo 
-    para asegurarse de que el mapa cumpla con los limites establecidos para cada tipo de elemento,
-    y asi evitar que el mapa sea demasiado facil o demasiado dificil
-
-    A Oswaldo le haria bien un baño ahora, pero no tiene tiempo para eso
-
+    Repara el mapa para que obstaculos, enemigos y recompensas respeten los rangos
+    indicados (por defecto los del documento, CONSTRAINTS). Modifica y regresa el mapa.
     """
-    MINIMO_OBSTACULOS, MAXIMO_OBSTACULOS = 30, 45
-    MINIMO_ENEMIGOS, MAXIMO_ENEMIGOS = 4, 8
-    MINIMO_RECOMPENSAS, MAXIMO_RECOMPENSAS = 3, 6
-
-    matriz_mapa = reparar_cantidad_elemento(matriz_mapa, '#', MINIMO_OBSTACULOS, MAXIMO_OBSTACULOS)
-    matriz_mapa = reparar_cantidad_elemento(matriz_mapa, 'E', MINIMO_ENEMIGOS, MAXIMO_ENEMIGOS)
-    matriz_mapa = reparar_cantidad_elemento(matriz_mapa, 'R', MINIMO_RECOMPENSAS, MAXIMO_RECOMPENSAS)
-    
+    rangos = CONSTRAINTS if rangos is None else rangos
+    for elemento, (minimo, maximo) in rangos.items():
+        reparar_cantidad_elemento(matriz_mapa, elemento, minimo, maximo)
     return matriz_mapa
+
 
 def generar_y_guardar_mapas(cantidad=100, nombre_archivo="poblacion_inicial.json"):
     """
@@ -411,3 +404,18 @@ def calculate_average_diversity(mapas: list[NDArray[np.int32]]) -> float:
             pares += 1
 
     return total / pares
+
+
+def fijar_semilla(semilla: int) -> None:
+    """
+    Fija la semilla de TODOS los generadores aleatorios del proyecto
+    (random y los rng de numpy de map_utils, filete y particulas)
+    para que una ejecucion se pueda repetir igual.
+    """
+    import sys
+
+    random.seed(semilla)
+    for nombre in ("generator.map_utils", "generator.filete", "generator.particulas"):
+        modulo = sys.modules.get(nombre)
+        if modulo is not None:
+            modulo.rng = np.random.default_rng(semilla)

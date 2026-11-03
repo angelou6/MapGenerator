@@ -1,0 +1,2 @@
+Escenario,Algoritmo,Mejor_Fitness,Fitness_Promedio,Desviacion_Std,Porcentaje_Validez,Dificultad_Promedio,Tiempo_Promedio_Seg
+facil,Algoritmo Genetico,35.0,316.9,124.02,100.0%,61.6,3.9653

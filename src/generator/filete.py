@@ -1,5 +1,6 @@
 import math
 import random
+from collections.abc import Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -76,11 +77,17 @@ def simulated_annealing(
     history: list[tuple[float, float]] | None = None,
     weights: tuple[float, float, float, float, float] = DEFAULT_WEIGHTS,
     rangos: dict[Elemento, tuple[int, int]] = CONSTRAINTS,
+    evaluar: Callable[[NDArray[np.int32]], float] | None = None,
 ) -> NDArray[np.int32]:
+    #si se pasa `evaluar` (Evaluador.fitness) se usa esa funcion para calificar cada mapa,
+    #asi RS califica exactamente igual que AG y PSO (incluye el extra de camino largo)
+    def calificar(m: NDArray[np.int32]) -> float:
+        if evaluar is not None:
+            return evaluar(m)
+        return calculate_fitness(m, bfs(m), expected_dificulty, weights)
+
     current = mapa.copy()
-    current_solution = bfs(current)
-    #Evalua con los pesos elegidos desde la ejecucion
-    current_score = calculate_fitness(current, current_solution, expected_dificulty, weights)
+    current_score = calificar(current)
 
     best = current.copy()
     best_score = current_score
@@ -93,9 +100,7 @@ def simulated_annealing(
     for _ in range(steps):
         #los vecionos respetaran los rangos del escenario elegido
         candidate = neighbor(current, rangos)
-        solution = bfs(candidate)
-        #usa los mismo pesos que todos los candidatos
-        score = calculate_fitness(candidate, solution, expected_dificulty, weights)
+        score = calificar(candidate)
         delta = score - current_score
         if delta <= 0 or random.random() < math.exp(-delta / temp):
             current = candidate

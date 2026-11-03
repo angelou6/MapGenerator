@@ -1,166 +1,147 @@
-"""Representacion numerica de las partículas para PSO"""
-from generator.map_utils import calculate_fitness
+"""
+Optimizacion por Enjambre de Particulas (PSO).
 
+Cada celda es un numero continuo en [0,1]; para evaluar se discretiza con los intervalos
+del documento (0-0.69 libre, 0.70-0.84 obstaculo, 0.85-0.94 enemigo, 0.95-1 recompensa)
+y se repara para respetar las cantidades permitidas. Se minimiza f(X).
+"""
 import numpy as np
-from numpy._typing import NDArray
+from numpy.typing import NDArray
 
-from generator.map_utils import CONSTRAINTS, reparar_cantidad_elemento
+from generator.map_utils import CONSTRAINTS
 from representation import MAP_SHAPE, Elemento
 
 rng = np.random.default_rng()
 
-def generate_random_particle() -> NDArray[np.float64]:
-    """Crea una partícula de 15x15 con valores entre 0 y 1"""
-    #cada celda recibe un valor decimal para utilizarlo luego en el PSO
-    particula = rng.random(MAP_SHAPE)
+# Intervalos [a, b) de cada elemento (seccion 10.2 del documento)
+INTERVALOS = {
+    Elemento.TRANSITABLE: (0.0, 0.70),
+    Elemento.OBSTACULO: (0.70, 0.85),
+    Elemento.ENEMIGO: (0.85, 0.95),
+    Elemento.RECOMPENZA: (0.95, 1.0),
+}
 
-    #reserva las esquinas de inicio y fin
+
+def generate_random_particle() -> NDArray[np.float64]:
+    """Crea una particula de 15x15 con valores entre 0 y 1 (inicio y meta en 0)."""
+    particula = rng.random(MAP_SHAPE)
     particula[0, 0] = 0.0
     particula[-1, -1] = 0.0
-
     return particula
 
-def particle_to_map(particula: NDArray[np.float64]) -> NDArray[np.int32]:
-    """Convierte los valores de una particula en elementos del mapa"""
-    #comprueba que la particula sea de 15x15 y que los valores esten entre tu y yo *guiño* (0 y 1)
+
+def mapa_a_particula(mapa: NDArray[np.int32]) -> NDArray[np.float64]:
+    """
+    Convierte un mapa en una particula cuya discretizacion devuelve exactamente ese mapa
+    (cada celda recibe un valor al azar dentro del intervalo de su elemento).
+    """
+    particula = np.zeros(MAP_SHAPE)
+    for elemento, (a, b) in INTERVALOS.items():
+        mascara = mapa == elemento
+        particula[mascara] = rng.uniform(a, b - 1e-9, int(mascara.sum()))
+    particula[0, 0] = 0.0
+    particula[-1, -1] = 0.0
+    return particula
+
+
+def particle_to_map(particula: NDArray[np.float64],
+                    rangos: dict[Elemento, tuple[int, int]] = CONSTRAINTS) -> NDArray[np.int32]:
+    """
+    Discretiza una particula y la repara.
+
+    Reparacion guiada por los valores continuos: se cuentan las celdas de cada intervalo,
+    se recorta cada cantidad a su rango [min, max] y las celdas se reparten por orden de
+    valor (las mas altas son recompensas, luego enemigos, luego obstaculos). Si las
+    cantidades ya estaban en rango el resultado es identico a la discretizacion simple.
+    """
     if particula.shape != MAP_SHAPE:
         raise ValueError("La particula debe tener un tamaño de 15x15")
     if not np.all(np.isfinite(particula) & (particula >= 0) & (particula <= 1)):
         raise ValueError("Los valores de la particula debe estar entre 0 y 1")
 
-    #conviertelos numeros en elementos usando los limites del documento y los valores menores 
-    #a 0.70 quedan libres
+    movible = np.ones(MAP_SHAPE, dtype=bool)
+    movible[0, 0] = movible[-1, -1] = False
+    valores = particula[movible]
+
+    def recortar(elemento, cantidad):
+        lo, hi = rangos.get(elemento, (0, valores.size))
+        return int(min(max(cantidad, lo), hi))
+
+    n_r = recortar(Elemento.RECOMPENZA, int(np.count_nonzero(valores >= 0.95)))
+    n_e = recortar(Elemento.ENEMIGO, int(np.count_nonzero((valores >= 0.85) & (valores < 0.95))))
+    n_o = recortar(Elemento.OBSTACULO, int(np.count_nonzero((valores >= 0.70) & (valores < 0.85))))
+
+    # desempate aleatorio minimo (al recortar en [0,1] muchas celdas valen exactamente 0 o 1)
+    orden = np.argsort(-(valores + rng.random(valores.size) * 1e-9))
+    celdas = np.zeros(valores.size, dtype=np.int32)
+    celdas[orden[:n_r]] = Elemento.RECOMPENZA
+    celdas[orden[n_r:n_r + n_e]] = Elemento.ENEMIGO
+    celdas[orden[n_r + n_e:n_r + n_e + n_o]] = Elemento.OBSTACULO
+
     mapa = np.zeros(MAP_SHAPE, dtype=np.int32)
-    mapa[particula >= 0.70] = Elemento.OBSTACULO
-    mapa[particula >= 0.85] = Elemento.ENEMIGO
-    mapa[particula >= 0.95] = Elemento.RECOMPENZA
-
-    #fija inicio y meta sin importar el valor decimal (por seguridad inicial)
+    mapa[movible] = celdas
     mapa[0, 0] = Elemento.INICIO
     mapa[-1, -1] = Elemento.META
-
-    # APLICACIÓN DE LA REPARACIÓN (TAREA #27)
-    # Oswaldo entra a escena: tomamos los rangos de constraints para reparar excesos o carencias.
-    
-    # 1. Reparar Obstáculos (usualmente entre 20 y 35)
-    min_obs, max_obs = CONSTRAINTS[Elemento.OBSTACULO]
-    mapa = reparar_cantidad_elemento(mapa, Elemento.OBSTACULO, min_obs, max_obs)
-    
-    # 2. Reparar Enemigos (usualmente entre 5 y 10)
-    min_ene, max_ene = CONSTRAINTS[Elemento.ENEMIGO]
-    mapa = reparar_cantidad_elemento(mapa, Elemento.ENEMIGO, min_ene, max_ene)
-    
-    # 3. Reparar Recompensas (usualmente entre 3 y 6)
-    min_rec, max_rec = CONSTRAINTS[Elemento.RECOMPENZA]
-    mapa = reparar_cantidad_elemento(mapa, Elemento.RECOMPENZA, min_rec, max_rec)
-
-    # Oswaldo protege su vida: asegurar definitivamente que las esquinas estén intactas tras la reparación.
-    mapa[0, 0] = Elemento.INICIO
-    mapa[-1, -1] = Elemento.META
-
     return mapa
 
+
 def update_particle_velocity_position(
-    posicion_actual: NDArray[np.float64],
-    velocidad_actual: NDArray[np.float64],
-    mejor_posicion_individual: NDArray[np.float64],
-    mejor_posicion_global: NDArray[np.float64],
-    w: float = 0.5,
-    c1: float = 1.5,
-    c2: float = 1.5
+    posicion_actual, velocidad_actual, mejor_posicion_individual, mejor_posicion_global,
+    w: float = 0.6, c1: float = 1.5, c2: float = 1.5, vmax: float = 0.5,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
-    Actualiza la velocidad y la posición de una partícula basándose en la fórmula matemática del PSO.
-    Retorna una tupla con (nueva_posicion, nueva_velocidad).
+    v(t+1) = w v(t) + c1 r1 (pbest - x) + c2 r2 (gbest - x);  x(t+1) = x(t) + v(t+1)
+    (formula del documento). Se limita |v| <= vmax y x a [0,1]; inicio/meta quedan en 0.
     """
-    # 1. Generar aleatoriedad para la decisión de este turno
     r1 = rng.random(MAP_SHAPE)
     r2 = rng.random(MAP_SHAPE)
+    velocidad = (w * velocidad_actual
+                 + c1 * r1 * (mejor_posicion_individual - posicion_actual)
+                 + c2 * r2 * (mejor_posicion_global - posicion_actual))
+    velocidad = np.clip(velocidad, -vmax, vmax)
+    posicion = np.clip(posicion_actual + velocidad, 0.0, 1.0)
+    posicion[0, 0] = 0.0
+    posicion[-1, -1] = 0.0
+    return posicion, velocidad
 
-    # 2. Calcular los tres componentes de la velocidad
-    inercia = w * velocidad_actual
-    cognitivo = c1 * r1 * (mejor_posicion_individual - posicion_actual)
-    social = c2 * r2 * (mejor_posicion_global - posicion_actual)
 
-    # 3. Sumar para obtener la nueva velocidad (v_t+1)
-    nueva_velocidad = inercia + cognitivo + social
-
-    # 4. Actualizar la posición sumando la velocidad (x_t+1)
-    nueva_posicion = posicion_actual + nueva_velocidad
-
-    # 5. Restringir la posición para que los decimales no salgan de [0.0, 1.0]
-    nueva_posicion = np.clip(nueva_posicion, 0.0, 1.0)
-
-    # Proteger las esquinas (inicio y meta deben mantenerse en 0.0 decimal)
-    nueva_posicion[0, 0] = 0.0
-    nueva_posicion[-1, -1] = 0.0
-
-    return nueva_posicion, nueva_velocidad
-
-def evaluar_y_actualizar_mejores(
-    posiciones_actuales: list[NDArray[np.float64]],
-    mejores_posiciones_individuales: list[NDArray[np.float64]],
-    mejores_fitness_individuales: list[float],
-    mejor_posicion_global: NDArray[np.float64] | None,
-    mejor_fitness_global: float,
-    evaluador: calculate_fitness
-) -> tuple[list[NDArray[np.float64]], list[float], NDArray[np.float64], float]:
+def ejecutar_pso(evaluador, rangos, mapas_iniciales, iteraciones=100, progreso=None):
     """
-    Evalúa el mapa de cada partícula en el turno actual y actualiza
-    tanto su mejor posición histórica individual como la mejor global del enjambre.
+    Ejecuta el enjambre completo; hay una particula por cada mapa inicial.
+
+    Returns:
+        (mapas_finales, historial): el mejor mapa historico (pbest) de cada particula, en
+        el mismo orden que mapas_iniciales, y una lista de dicts
+        {iteracion, mejor, media, peor} sobre los pbest (iteracion 0 = estado inicial).
     """
-    # Recorremos cada partícula del enjambre
-    for i in range(len(posiciones_actuales)):
-        particula_actual = posiciones_actuales[i]
-        
-        # 1. Convertir a mapa físico con los límites reparados (Tarea #27)
-        mapa_fisico = particle_to_map(particula_actual)
-        
-        # 2. Calificar el mapa (el evaluador devuelve el fitness como primer valor)
-        fitness_actual, _ = evaluador.evaluar_mapa(mapa_fisico)
-        
-        # 3. Actualizar memoria individual: ¿Es este mapa mejor que su mejor histórico?
-        if fitness_actual < mejores_fitness_individuales[i]:
-            mejores_fitness_individuales[i] = fitness_actual
-            mejores_posiciones_individuales[i] = particula_actual.copy()
-            
-        # 4. Actualizar memoria global: ¿Es este mapa el mejor de todo el enjambre?
-        if fitness_actual < mejor_fitness_global:
-            mejor_fitness_global = fitness_actual
-            mejor_posicion_global = particula_actual.copy()
+    n = len(mapas_iniciales)
+    posiciones = [mapa_a_particula(np.asarray(m)) for m in mapas_iniciales]
+    velocidades = [np.zeros(MAP_SHAPE) for _ in range(n)]
 
-    return mejores_posiciones_individuales, mejores_fitness_individuales, mejor_posicion_global, mejor_fitness_global
+    pbest_pos = [p.copy() for p in posiciones]
+    pbest_map = [particle_to_map(p, rangos) for p in posiciones]
+    pbest_fit = [evaluador.fitness(m) for m in pbest_map]
+    g = int(np.argmin(pbest_fit))
+    gbest_pos = pbest_pos[g].copy()
 
-def ejecutar_pso(num_particulas: int, iteraciones: int) -> tuple[NDArray[np.int32], list[float]]:
-    """Ejecuta el ciclo completo de optimización por enjambre de partículas."""
-    # 1. Inicializar posiciones y velocidades aleatorias
-    posiciones = [generate_random_particle() for _ in range(num_particulas)]
-    velocidades = [np.zeros(MAP_SHAPE) for _ in range(num_particulas)]
-    
-    # 2. Inicializar memorias
-    mejores_posiciones_individuales = posiciones.copy()
-    mejores_fitness_individuales = [float('inf')] * num_particulas
-    
-    mejor_posicion_global = None
-    mejor_fitness_global = float('inf')
-    
-    historial_fitness = []
-    
-    # 3. Bucle principal
-    for _ in range(iteraciones):
-        # Evaluar mapas y actualizar los récords (Tarea #29)
-        mejores_posiciones_individuales, mejores_fitness_individuales, mejor_posicion_global, mejor_fitness_global = evaluar_y_actualizar_mejores(
-            posiciones, mejores_posiciones_individuales, mejores_fitness_individuales, mejor_posicion_global, mejor_fitness_global
-        )
-        
-        historial_fitness.append(mejor_fitness_global)
-        
-        # Calcular nueva velocidad y mover cada partícula (Tarea #28)
-        for i in range(num_particulas):
+    historial = []
+
+    def registrar(it):
+        historial.append({"iteracion": it, "mejor": float(min(pbest_fit)),
+                          "media": float(np.mean(pbest_fit)), "peor": float(max(pbest_fit))})
+
+    registrar(0)
+    for it in range(1, iteraciones + 1):
+        for i in range(n):
             posiciones[i], velocidades[i] = update_particle_velocity_position(
-                posiciones[i], velocidades[i], mejores_posiciones_individuales[i], mejor_posicion_global
-            )
-            
-    # 4. Extraer el mejor resultado absoluto y convertirlo a enteros
-    mejor_mapa_final = particle_to_map(mejor_posicion_global)
-    return mejor_mapa_final, historial_fitness
+                posiciones[i], velocidades[i], pbest_pos[i], gbest_pos)
+            mapa = particle_to_map(posiciones[i], rangos)
+            fit = evaluador.fitness(mapa)
+            if fit < pbest_fit[i]:
+                pbest_fit[i], pbest_pos[i], pbest_map[i] = fit, posiciones[i].copy(), mapa
+        g = int(np.argmin(pbest_fit))
+        gbest_pos = pbest_pos[g].copy()
+        registrar(it)
+        if progreso:
+            progreso(it, iteraciones)
+    return pbest_map, historial
