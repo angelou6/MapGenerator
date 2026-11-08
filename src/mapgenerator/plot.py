@@ -66,13 +66,14 @@ def run_escenario(algoritmo: str, escenario: str) -> RunResult:
     }
 
 
-def run(name: str) -> dict[str, list[float]]:
+def run(name: str) -> tuple[dict[str, list[float]], float]:
     history: dict[str, list[float]] = {}
+    start = time.perf_counter()
     _ = ALGORITHMS[name](DEFAULT_DIFICULTY, history=history)
-    return history
+    return history, time.perf_counter() - start
 
 
-def plot(name: str, histories: list[dict[str, list[float]]]) -> None:
+def plot(name: str, histories: list[dict[str, list[float]]], tiempos: list[float]) -> None:
     metrics = list(histories[0])
     fig, axes = plt.subplots(1, len(metrics), figsize=(6 * len(metrics), 4))
     for ax, metric in zip(axes, metrics):
@@ -84,7 +85,9 @@ def plot(name: str, histories: list[dict[str, list[float]]]) -> None:
         _ = ax.set_xlabel("iteración")
         ax.grid(alpha=0.3)
         _ = ax.legend()
-    _ = fig.suptitle(f"{name} ({RUNS} ejecuciones)")
+    _ = fig.suptitle(
+        f"{name} ({RUNS} ejecuciones, tiempo promedio {np.mean(tiempos):.2f} s)"
+    )
     fig.tight_layout()
     fig.savefig(IMAGES / f"{name}.png")
     plt.close(fig)
@@ -125,7 +128,8 @@ def main() -> None:
             for name in ALGORITHMS
         }
         for name, runs in historias.items():
-            plot(name, [future.result() for future in runs])
+            histories, tiempos = zip(*(future.result() for future in runs))
+            plot(name, list(histories), list(tiempos))
             print(f"Guardado {IMAGES / f'{name}.png'}")
         results = {k: [f.result() for f in fs] for k, fs in futures.items()}
 
